@@ -38,6 +38,10 @@ GitHub production delivery deploys staging/production relays and runs only the C
 - Physical iOS installation and launch with the expected revision.
 - Live relay rollback and restoration to the intended release.
 
+## First live delivery attempt
+
+[Production delivery 37746403785](https://github.com/lihyin/agent-gateway/actions/runs/37746403785) passed release verification and deployed staging version `e867964e-3a48-4bfa-8da4-28105d336fb1` for commit `f9e1f91241134fb7276149dc2fdd3dbe67362caf`. Its immediate health check received an HTML response before the endpoint became available, so the workflow stopped before production/mobile delivery. A subsequent live check verified staging health, the exact revision, and disabled source access. Health verification now uses bounded propagation retries and still rejects mismatched service/environment or enabled source access immediately. No production or TestFlight completion is claimed for this attempt.
+
 No Gmail, push-provider, pairing, encryption, connector, or approval features have been implemented in Day 1. Later milestones remain pending.
 
 ## GitHub CI evidence
