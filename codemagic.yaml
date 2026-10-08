@@ -75,7 +75,7 @@ workflows:
       groups: [production_mobile]
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.deepshareai.agentgateway
+        bundle_identifier: com.agentbrain.agentgateway
       flutter: 3.47.6
       xcode: "26.6"
       cocoapods: default
