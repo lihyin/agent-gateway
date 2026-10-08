@@ -4,9 +4,9 @@ Enter secrets directly in provider settings, never in chat or committed files. C
 
 ## 1. Git identity and repository
 
-Provide the commit author name and email. Repository: `DeepShareAI/agent-gateway`; working branch: `relay-architecture`. Enable GitHub Actions and allow the selected Actions used by CI. Add a `production` GitHub environment, restrict deployments to the intended trusted branch, and configure release reviewers if your team requires them. Release is explicitly dispatched from the selected branch, not triggered by pull requests.
+Provide the commit author name and email. Current release repository: `lihyin/agent-gateway`; default/release branch: `relay-architecture`. Enable GitHub Actions and allow the selected Actions used by CI. Add a `production` GitHub environment, restrict deployments to the intended trusted branch, and configure release reviewers if your team requires them. Release is explicitly dispatched from the selected branch, not triggered by pull requests.
 
-GitHub requires manually dispatched workflow files to exist on the repository's default branch. Currently `main` contains the older server/web implementation, while the mobile-authoritative Day 1 implementation and release/recovery workflows are on `relay-architecture`. Before dispatch, promote the intended implementation to the default branch or explicitly select `relay-architecture` as the repository's default branch. Confirm the trusted deployment-branch restriction matches the branch selected for delivery. Do not dispatch the older implementation.
+GitHub requires manually dispatched workflow files to exist on the repository's default branch. The fork uses `relay-architecture` as its default branch, which registers the production and recovery workflows. Its `main` branch retains the older server/web implementation. Confirm the trusted deployment-branch restriction matches the branch selected for delivery. Do not dispatch the older implementation.
 
 The Day 1 production workflow runs the checks again on its selected commit. Codemagic verifies the fetched commit before building; branch drift fails the build rather than silently shipping a different revision. Keep the release branch stable during delivery. A deployment can succeed while mobile distribution fails; the aggregate release must remain failed in that situation.
 
@@ -21,7 +21,7 @@ No Gmail, APNs, FCM, or payload cryptographic secrets are needed for the health-
 
 ## 3. Codemagic
 
-1. Create/select a Codemagic team and connect the GitHub repository with read access to the release branch. Add it as a Flutter application and select the repository-root `codemagic.yaml`.
+1. Create/select a Codemagic team and connect `lihyin/agent-gateway` with read access to the release branch. If reusing the existing application, change its repository under App settings > Repository settings and grant the Codemagic GitHub App access to the fork. Add it as a Flutter application and select the repository-root `codemagic.yaml`.
 2. Confirm the Codemagic app ID and store it as the GitHub `production` environment variable `CM_APP_ID`.
 3. Create a Codemagic API token with a team role permitted to start/read builds. Store it as GitHub secret `CM_API_TOKEN`. The workflow uses the official v3 API; it waits for build completion and checks app/workflow/commit/artifact identity.
 4. Create a Codemagic environment group `production_mobile`, accessible only to trusted release workflows. Configure the signing and store credentials below.
