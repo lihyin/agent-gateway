@@ -14,7 +14,7 @@ The Day 1 production workflow runs the checks again on its selected commit. Code
 
 1. Create/sign into the Cloudflare account and enable Workers with a `workers.dev` subdomain.
 2. Confirm the account ID, Worker names, and preferred HTTPS URLs. Defaults: `agent-gateway-relay-staging` and `agent-gateway-relay-production` in `relay/wrangler.toml`. Custom domains are optional for Day 1.
-3. Create a scoped API token permitting Worker deployment in that account. Use Cloudflare's Workers deployment token template as the starting point and restrict its account scope. Store the token as `CLOUDFLARE_API_TOKEN` and the account ID as `CLOUDFLARE_ACCOUNT_ID` in the GitHub `production` environment secrets.
+3. Create a scoped API token permitting Worker deployment in that account. Use Cloudflare's Workers deployment token template as the starting point and restrict its account scope. Store the token as the GitHub `production` environment secret `CLOUDFLARE_API_TOKEN`. Store the non-secret account ID as environment variable `CLOUDFLARE_ACCOUNT_ID`; the workflows also accept an existing secret with that name when the variable is absent.
 4. Set environment variables `STAGING_RELAY_URL` and `RELAY_URL` to the exact HTTPS Worker origins. The workflow verifies `/health`, the environment, the deployed commit, and disabled source access after each deployment.
 
 No Gmail, APNs, FCM, or payload cryptographic secrets are needed for the health-only Day 1 Worker. Provider credentials are introduced in their later milestones.
