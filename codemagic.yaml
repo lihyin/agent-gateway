@@ -85,7 +85,7 @@ workflows:
           set -eu
           test "$(git rev-parse HEAD)" = "$EXPECTED_REVISION"
           test -n "$RELAY_URL"
-          test -n "$APP_STORE_APPLE_ID"
+          test -n "$APP_STORE_ID"
       - name: Analyze and test
         script: |
           set -eu
@@ -101,7 +101,7 @@ workflows:
         script: |
           set -eu
           cd mobile
-          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID")
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_ID")
           BUILD_NUMBER=$((LATEST + 1))
           flutter build ipa --release --build-number="$BUILD_NUMBER" --export-options-plist=/Users/builder/export_options.plist --dart-define=RELAY_URL="$RELAY_URL" --dart-define=RELEASE_SHA="$EXPECTED_REVISION" --dart-define=ENVIRONMENT=production
     artifacts:

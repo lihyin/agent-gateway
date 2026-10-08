@@ -46,7 +46,7 @@ The configured workflow builds a signed AAB and publishes to the internal track.
 1. Confirm active Apple Developer membership and the team. Confirmed iOS bundle ID: `com.agentbrain.agentgateway`. Register that App ID and use the matching App Store Connect app record.
 2. Create an App Store Connect API integration in Codemagic named `agent-gateway-asc` with the permissions required for signing/upload/TestFlight. Enter the issuer ID, key ID, and private key directly into Codemagic.
 3. Upload or generate a valid Apple distribution certificate and App Store provisioning profile in Codemagic for the exact bundle ID. The `ios_signing` configuration selects matching identities; `xcode-project use-profiles` applies them.
-4. Set the numeric App Store Connect app ID as `APP_STORE_APPLE_ID` in `production_mobile`.
+4. Set the numeric App Store Connect app ID as `APP_STORE_ID` in `production_mobile`.
 5. Create the TestFlight group `Agent Gateway Internal`, add testers, and complete required app/export-compliance/beta information. Confirm the selected group supports the intended internal/external tester flow; external beta review may delay access.
 
 The workflow uploads a signed IPA and requests TestFlight distribution, without public App Store submission. The orchestrator also waits for v3 `app_store_connect_status` to finish. If that status is missing, fails, or times out, delivery fails closed. Actual tester visibility and installation still require checking TestFlight and the physical device; API completion cannot prove installation.
