@@ -9,9 +9,9 @@ on:
         default: staging
         required: true
       operation:
-        description: List versions or activate an explicitly selected compatible version
+        description: List versions, deploy this relay commit, or activate a compatible version
         type: choice
-        options: [list, rollback]
+        options: [list, deploy, rollback]
         default: list
         required: true
       version_id:
@@ -35,7 +35,7 @@ jobs:
       WRANGLER_SEND_METRICS: "false"
       TARGET_ENVIRONMENT: ${{ inputs.relay_environment }}
       TARGET_VERSION: ${{ inputs.version_id }}
-      EXPECTED_REVISION: ${{ inputs.expected_revision }}
+      EXPECTED_REVISION: ${{ inputs.expected_revision || github.sha }}
       EXPECTED_ENVIRONMENT: ${{ inputs.relay_environment }}
       RELAY_URL: ${{ inputs.relay_environment == 'staging' && vars.STAGING_RELAY_URL || vars.RELAY_URL }}
     steps:
@@ -71,10 +71,19 @@ jobs:
           JS
       - name: List deployed versions
         run: npx wrangler deployments list --config relay/wrangler.toml --env "$TARGET_ENVIRONMENT" --json > relay-deployments-before.json
-      - name: Activate selected version and verify health
+      - name: Validate and deploy this relay commit
+        if: inputs.operation == 'deploy'
+        run: |
+          test "$EXPECTED_REVISION" = "$(git rev-parse HEAD)"
+          npm run check
+          npx wrangler deploy --config relay/wrangler.toml --env "$TARGET_ENVIRONMENT" --var "RELEASE_SHA:$EXPECTED_REVISION"
+      - name: Activate selected version
         if: inputs.operation == 'rollback'
         run: |
           npx wrangler rollback "$TARGET_VERSION" --config relay/wrangler.toml --env "$TARGET_ENVIRONMENT" --message "Explicit compatible relay recovery" --yes
+      - name: Verify health and record resulting deployment
+        if: inputs.operation != 'list'
+        run: |
           node scripts/verify-health.mjs
           npx wrangler deployments list --config relay/wrangler.toml --env "$TARGET_ENVIRONMENT" --json > relay-deployments-after.json
       - uses: actions/upload-artifact@v4
