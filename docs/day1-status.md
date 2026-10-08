@@ -35,7 +35,6 @@ GitHub production delivery deploys staging/production relays and runs only the C
 - Successful use of the configured Apple signing identities, app record, and TestFlight group during the native release build.
 - Successful signed iOS build and TestFlight distribution; native iOS builds require Codemagic.
 - Physical iOS installation and launch with the expected revision.
-- Production relay rollback/restoration (staging rollback/restoration has passed).
 
 ## First live delivery attempt
 
@@ -51,6 +50,20 @@ GitHub production delivery deploys staging/production relays and runs only the C
 Codemagic accepted iOS build `6ac74dfbde4f6899ca0d1ec6`. The orchestrator received HTML from the first status request and correctly failed rather than claiming delivery. [Inspection 37747495109](https://github.com/lihyin/agent-gateway/actions/runs/37747495109) subsequently confirmed the matching app/workflow/commit but a failed build, no IPA artifacts, and no completed TestFlight processing. Requests now explicitly accept JSON and tolerate a bounded initial non-JSON status window; persistent invalid responses remain failures.
 
 [Staging rollback 37747525379](https://github.com/lihyin/agent-gateway/actions/runs/37747525379) activated the earlier verified `f9e1f91` version and passed health verification. [Staging restoration 37747618204](https://github.com/lihyin/agent-gateway/actions/runs/37747618204) restored version `8b4d7b4e-2749-4afc-9144-6396f0da0552` and verified `c681c1d`. Both recovery runs succeeded and recorded deployment artifacts.
+
+## Current live state and completed production recovery
+
+Both environments currently serve verified commit `5ddb65bfe0fdf1b2b3f691e4cf7b4a6be8b8a8da`, whose relay source is unchanged from the earlier verified health-only release:
+
+- [Staging deployment 37748095603](https://github.com/lihyin/agent-gateway/actions/runs/37748095603): version `379edf96-0614-4afd-a823-06b82321d1b9`.
+- [Production deployment 37748247590](https://github.com/lihyin/agent-gateway/actions/runs/37748247590): version `dd2ed2af-44e7-4973-b56d-1bad99e9e3c5`.
+- [Production rollback 37748357092](https://github.com/lihyin/agent-gateway/actions/runs/37748357092): restored the preceding compatible `c681c1d` version and verified health.
+- [Production restoration 37748444791](https://github.com/lihyin/agent-gateway/actions/runs/37748444791): restored the current `5ddb65b` version and verified health.
+- [CI 37748095624](https://github.com/lihyin/agent-gateway/actions/runs/37748095624): passed for `5ddb65b`, including the 16 Node tests and Android debug build.
+
+All deployment/recovery runs above succeeded. Independent live checks after production restoration verified both health endpoints at `5ddb65b`, disabled source access, and HTTP 404 for POST `/v1/requests`, `/v1/results`, and `/gmail`. Relay deployment and staging/production rollback acceptance are complete.
+
+[iOS inspection 37747883074](https://github.com/lihyin/agent-gateway/actions/runs/37747883074) confirmed the accepted Codemagic build failed before any actions were recorded (`actions: []`). The v3 API does not expose the initial setup error through these build/action responses. The owner must provide the first setup/configuration error from [the Codemagic build page](https://codemagic.io/app/6ac702d60b18618374bedc06/build/6ac74dfbde4f6899ca0d1ec6). iOS build, TestFlight delivery, and physical installation remain pending; aggregate Day 1 completion is not claimed.
 
 No Gmail, push-provider, pairing, encryption, connector, or approval features have been implemented in Day 1. Later milestones remain pending.
 
