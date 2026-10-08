@@ -42,7 +42,11 @@ export async function runBuild({
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   attempts = 360,
 }) {
-  const headers = { "x-auth-token": token, "Content-Type": "application/json" };
+  const headers = {
+    "x-auth-token": token,
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
   async function api(path, options = {}) {
     const response = await fetchImpl(`https://codemagic.io/api/v3${path}`, {
       ...options,
@@ -55,7 +59,15 @@ export async function runBuild({
       error.status = response.status;
       throw error;
     }
-    return (await response.json()).data;
+    let payload;
+    try {
+      payload = await response.json();
+    } catch {
+      const error = new Error(`Codemagic API returned non-JSON at ${path}`);
+      error.transient = true;
+      throw error;
+    }
+    return payload.data;
   }
   const started = await api(`/apps/${encodeURIComponent(appId)}/builds`, {
     method: "POST",
@@ -76,7 +88,7 @@ export async function runBuild({
       build = await api(`/builds/${started.id}`);
     } catch (error) {
       // The v3 API explicitly allows a short eventual-consistency window after acceptance.
-      if (error.status === 404 && attempt < 5) {
+      if ((error.status === 404 || error.transient) && attempt < 5) {
         await sleep(30000);
         continue;
       }

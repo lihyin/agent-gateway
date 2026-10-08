@@ -31,16 +31,26 @@ GitHub production delivery deploys staging/production relays and runs only the C
 
 ## Pending acceptance evidence
 
-- Production delivery workflow execution with configured provider accounts.
-- Live verification of configured Cloudflare credentials, deployed staging/production URLs and revision checks.
-- Live verification of the user-configured Codemagic integration, Apple signing identities, app record, and TestFlight group.
+- Successful aggregate production delivery (relay deployment has passed; mobile delivery remains incomplete).
+- Successful use of the configured Apple signing identities, app record, and TestFlight group during the native release build.
 - Successful signed iOS build and TestFlight distribution; native iOS builds require Codemagic.
 - Physical iOS installation and launch with the expected revision.
-- Live relay rollback and restoration to the intended release.
+- Production relay rollback/restoration (staging rollback/restoration has passed).
 
 ## First live delivery attempt
 
 [Production delivery 37746403785](https://github.com/lihyin/agent-gateway/actions/runs/37746403785) passed release verification and deployed staging version `e867964e-3a48-4bfa-8da4-28105d336fb1` for commit `f9e1f91241134fb7276149dc2fdd3dbe67362caf`. Its immediate health check received an HTML response before the endpoint became available, so the workflow stopped before production/mobile delivery. A subsequent live check verified staging health, the exact revision, and disabled source access. Health verification now uses bounded propagation retries and still rejects mismatched service/environment or enabled source access immediately. No production or TestFlight completion is claimed for this attempt.
+
+## Live relay and staging recovery evidence
+
+[Production delivery 37746895019](https://github.com/lihyin/agent-gateway/actions/runs/37746895019) passed verification, deployed both relays, and verified commit `c681c1d6f74ce8174c7f825dc0117253cbc65e15` with source access disabled:
+
+- Staging: `https://agent-gateway-relay-staging.agentbrain.workers.dev`, version `8b4d7b4e-2749-4afc-9144-6396f0da0552`.
+- Production: `https://agent-gateway-relay-production.agentbrain.workers.dev`, version `0cfc6e15-a683-4c82-a88a-de6536169e45`.
+
+Codemagic accepted iOS build `6ac74dfbde4f6899ca0d1ec6`. The orchestrator received HTML from the first status request and correctly failed rather than claiming delivery. [Inspection 37747495109](https://github.com/lihyin/agent-gateway/actions/runs/37747495109) subsequently confirmed the matching app/workflow/commit but a failed build, no IPA artifacts, and no completed TestFlight processing. Requests now explicitly accept JSON and tolerate a bounded initial non-JSON status window; persistent invalid responses remain failures.
+
+[Staging rollback 37747525379](https://github.com/lihyin/agent-gateway/actions/runs/37747525379) activated the earlier verified `f9e1f91` version and passed health verification. [Staging restoration 37747618204](https://github.com/lihyin/agent-gateway/actions/runs/37747618204) restored version `8b4d7b4e-2749-4afc-9144-6396f0da0552` and verified `c681c1d`. Both recovery runs succeeded and recorded deployment artifacts.
 
 No Gmail, push-provider, pairing, encryption, connector, or approval features have been implemented in Day 1. Later milestones remain pending.
 

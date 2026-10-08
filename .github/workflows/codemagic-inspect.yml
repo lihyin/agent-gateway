@@ -40,4 +40,11 @@ jobs:
             testflight: build.app_store_connect_status,
             artifacts: build.artifacts?.map(a => a.name),
           }, null, 2));
+          const actionsResponse = await fetch(`https://codemagic.io/api/v3/builds/${process.env.CM_BUILD_ID}/actions`, {
+            headers: { 'x-auth-token': process.env.CM_API_TOKEN, Accept: 'application/json' },
+            redirect: 'error', signal: AbortSignal.timeout(30000),
+          });
+          if (!actionsResponse.ok) throw new Error(`Build actions returned HTTP ${actionsResponse.status}`);
+          const actions = (await actionsResponse.json()).data;
+          console.log(JSON.stringify({ actions: actions.map(a => ({ name: a.name, status: a.status })) }, null, 2));
           JS

@@ -56,6 +56,7 @@ test("trigger acceptance and temporary 404 are followed through to authenticated
     sleep: async () => {},
     fetchImpl: async (url, options) => {
       assert.equal(options.headers["x-auth-token"], "test-token");
+      assert.equal(options.headers.Accept, "application/json");
       assert.equal(options.redirect, "error");
       assert.ok(url.startsWith("https://codemagic.io/api/v3/"));
       calls++;
@@ -88,4 +89,47 @@ test("queued build exhausts bounded polling instead of reporting success", async
     }),
     /timed out/,
   );
+});
+
+test("initial HTML status responses are retried without starting another build", async () => {
+  const id = "a".repeat(24);
+  const replies = [
+    Response.json({ data: { id } }, { status: 202 }),
+    new Response("<!doctype html>"),
+    Response.json({ data: { ...complete, id } }),
+  ];
+  let starts = 0;
+  const result = await runBuild({
+    ...identity,
+    branch: "release",
+    relayUrl: "https://relay.test",
+    token: "test",
+    sleep: async () => {},
+    fetchImpl: async (url, options) => {
+      assert.equal(options.headers.Accept, "application/json");
+      if (options.method === "POST") starts++;
+      return replies.shift();
+    },
+  });
+  assert.equal(starts, 1);
+  assert.equal(result.status, "finished");
+});
+
+test("persistent HTML responses fail after the initial bounded window", async () => {
+  let calls = 0;
+  await assert.rejects(
+    runBuild({
+      ...identity,
+      branch: "release",
+      relayUrl: "https://relay.test",
+      token: "test",
+      sleep: async () => {},
+      fetchImpl: async () =>
+        calls++ === 0
+          ? Response.json({ data: { id: "a".repeat(24) } })
+          : new Response("<!doctype html>"),
+    }),
+    /Codemagic API returned non-JSON/,
+  );
+  assert.equal(calls, 7);
 });
