@@ -1,7 +1,9 @@
 # Meta Muse integration gate
 
 Reviewed October 10, 2026. Target: Meta's personal Muse agent, pending user
-confirmation. This is a compatibility decision, not a working connector.
+confirmation. A local [stdio MCP server](mcp.md) and foreground encrypted
+pairing/delivery are implemented. This is not a hosted personal-Muse connector;
+no real Muse account connection is claimed.
 
 ## Supported interface
 

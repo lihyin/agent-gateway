@@ -2,6 +2,12 @@
 
 ## Meta Muse compatibility gate
 
+An official-SDK stdio MCP server exposes bounded preview requests, status and
+verified encrypted-result submission through the same agent bridge. Pairing is
+operator-managed. SDK client tests cover discovery, idempotence, expiry,
+scope/forgery rejection and a real subprocess. See [MCP setup](mcp.md).
+Remote hosting and a real Muse account connection remain unimplemented/unverified.
+
 Pairing and encrypted manual foreground delivery are implemented; see
 [paired delivery](paired-delivery.md). Protected device keys, pinned agent epochs,
 durable request reservations and approval-bound encrypted result export have

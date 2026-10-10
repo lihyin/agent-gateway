@@ -20,6 +20,7 @@ The plan establishes production delivery on Day 1: Cloudflare relay, GitHub Acti
 - [Device-local Gmail and approval setup](docs/gmail-setup.md)
 - [Meta Muse compatibility and integration prerequisites](docs/meta-muse.md)
 - [Pairing and encrypted foreground delivery](docs/paired-delivery.md)
+- [Local MCP server and tool testing](docs/mcp.md)
 
 ## Local development
 

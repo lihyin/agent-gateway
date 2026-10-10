@@ -23,6 +23,13 @@ The Worker and push providers are untrusted for payload confidentiality and auth
 
 ## Required controls
 
+The stdio MCP server uses the paired bridge with no pairing, source-token or
+approval override tools. Closed tool schemas, JSON-RPC line/element limits and
+envelope budgets constrain inputs. Stable request IDs give identical retries
+without extending expiry. Results are verified against pinned identities, context,
+and original field/count/time scope. No HTTP listener or remote account linking
+is implemented. See [MCP setup](mcp.md).
+
 - Authenticate pairing and pin keys. Use reviewed encryption/signature libraries and bind message direction, version, identities, request ID, and expiry.
 - Perform OAuth and refresh locally with PKCE, state, validated redirects, and minimum scopes. Never send source tokens through the relay.
 - Protect mobile secrets using platform secure storage. Define locked-device behavior, backup exclusions, rotation, source disconnect, and unpairing. Verify hardware-backed capabilities instead of assuming every key supports them.

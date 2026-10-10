@@ -163,11 +163,25 @@ export class Bridge {
   }
   request(
     payload: Record<string, unknown>,
+    requestId: string = randomUUID(),
   ): Promise<{ requestId: string; status: string; envelope: Envelope }> {
     return this.run(async () => {
       const pair = this.state.pairing;
       if (!pair) throw new Error("unpaired");
       const now = this.clock();
+      const existing = this.state.jobs[requestId];
+      if (existing) {
+        if (canonical(existing.scope) !== canonical(payload))
+          throw new Error("replay");
+        if (existing.envelope.context.expiresAt <= now)
+          throw new Error("expired");
+        return {
+          requestId,
+          status:
+            (existing.result?.status as string) ?? "pending_device_review",
+          envelope: existing.envelope,
+        };
+      }
       for (const [id, job] of Object.entries(this.state.jobs))
         if (job.envelope.context.expiresAt + 86400 < now)
           delete this.state.jobs[id];
@@ -187,7 +201,7 @@ export class Bridge {
       const context: Context = {
         version: 1,
         direction: "request",
-        requestId: randomUUID(),
+        requestId,
         sender: await identityId(this.state.identity),
         recipient: await identityId(pair.identity),
         pairingEpoch: pair.epoch,
@@ -200,7 +214,10 @@ export class Bridge {
         context,
         payload,
       );
-      this.state.jobs[context.requestId] = { envelope, scope: payload };
+      this.state.jobs[context.requestId] = {
+        envelope,
+        scope: structuredClone(payload),
+      };
       await this.persist();
       return {
         requestId: context.requestId,
