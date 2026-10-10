@@ -9,7 +9,12 @@
     "build": "tsc --outDir dist --noEmit false"
   },
   "devDependencies": {
-    "tsx": "^4.0.0",
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "jose": "^6.2.12"
   }
 }

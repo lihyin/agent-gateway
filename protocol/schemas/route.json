@@ -1,0 +1,32 @@
+{
+  "$id": "https://agent-gateway.invalid/protocol/v1/route",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "agent",
+    "device",
+    "pairingEpoch",
+    "pushProvider",
+    "pushToken",
+    "callbackOrigin",
+    "issuedAt",
+    "expiresAt"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "agent": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "device": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "pairingEpoch": { "type": "string", "format": "uuid" },
+    "pushProvider": { "enum": ["apns", "fcm"] },
+    "pushToken": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "callbackOrigin": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://",
+      "maxLength": 200
+    },
+    "issuedAt": { "type": "integer", "minimum": 0 },
+    "expiresAt": { "type": "integer", "minimum": 0 }
+  }
+}

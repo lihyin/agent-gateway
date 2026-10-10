@@ -1,0 +1,59 @@
+{
+  "testKeysOnly": true,
+  "signingPrivate": {
+    "kty": "EC",
+    "x": "OHA8nUXi-YWdUDl-VTur2SJAeZ2YbpBm9uDzRFfU4N8",
+    "y": "SCmCh9eECHfhFFMIGRqOhicg6mG_KtdmEsxjRKXMNsE",
+    "crv": "P-256",
+    "d": "x58TpULOiVwt3th8HFNFhfE0XS46Y0iH3yYMOWuiQUs",
+    "kid": "RJRy9MwpNUweOf1HCRXMOBlK3mJhxZotSN2ho1tIYvA"
+  },
+  "signingPublic": {
+    "kty": "EC",
+    "x": "OHA8nUXi-YWdUDl-VTur2SJAeZ2YbpBm9uDzRFfU4N8",
+    "y": "SCmCh9eECHfhFFMIGRqOhicg6mG_KtdmEsxjRKXMNsE",
+    "crv": "P-256",
+    "kid": "RJRy9MwpNUweOf1HCRXMOBlK3mJhxZotSN2ho1tIYvA"
+  },
+  "encryptionPrivate": {
+    "kty": "RSA",
+    "n": "x3XH8bkeCeORdnz8cG-RifH_gUuVEqOE7pfd0DpW3_qGWQR4SbxTj8ti4zw7tgIIV4_8DzBdEJXiECdEbTwz8guA0ERn2ZLDZsojFFfx1ei_DdJ7Yo4TzJQumke-QW5KmrWF_k1cXoBEaF-mby7Deu0FgIjHBRvbjAdHR4kEjVBy4gH1WUaCw_hdG9HWWhoM_q-RYUJklDeEoKd0kR4L6Emw_47SM2bh2VThBJDSVU0pxR2oDon2DFVcGCMmIQO7ix5VN9kV-Q-EbELvJAQC14Ud8D5xjW6dauxxp3gn1CNZWKxk8iACHChwp9jHHOo_iQM-PC5l9fmux4ur6IV-DQ",
+    "e": "AQAB",
+    "d": "B2wqeXmDlNJLUVGmYpgW85S2Bug6pHEXBc_7TlVAHWFTyuU_2rKaQ3bJ98h_366PWT7U86BqSNnjCenZgd0kgQ83hx3nOsaw5IGE26wde5yH25T9HXZJu1UPr5MYO-lwTPXmBh134Ku89UtgmgZEpQLur6anYq5zivBMZpeX5pr1IwDOcijt7_iIXiz5gT6zftc020G3yOmdVRITjf9tBuZlUTj3n4cw7jvnR6pG1DsnyXQ4HRENRoQVjTrNJZm-PizEMZ3jMg7KfLnUtyQElURsLyos-8HUPtIks7ds-Dh3yvaVezluj08TyseMnZGYHn4RaH_pn7XQ8fGWz5W-QQ",
+    "p": "7F60WPZG3HovksVGOw16AbPNT5O8A5sxYacLnhyYkokop_jy28v_cpyVX4aNcR-flRVeTWVg6VItsbQYmG5zueNPw4-TB6LZtprgcpclF3MR_99hVEiUdystRJW2EtIwVjnF9bQU9ng_FcaUi6EAd5yOsQPAdMIMTa-aSuma2SE",
+    "q": "2AZcqWOJW4-yQbM2vQYHqFISCClhvZN11QRFyR3NW3TZG_XNS9k6AU71wWSoTYt5RQ5_hsCe8hNbkLXqFCwOqsSVsKKdRPGHkcq0DZEdcIg5ytoVw52a3uzDejNjFXJ22dKr0MujC2wtMFkNSuJtepaE5vGTxTDWRRwV5grOq20",
+    "dp": "eu7ic2ZbAm5V8crCNRJUQzBldp7KaUG81CISC8CppYTKbVovzRrzF4PSuGT9iTk-QUZkznIMjizccRDOvfCsJaDQqlAw0wbinnM8iryLYP_K-74NG83H0ZbWK1aF5JIG68GOcLShNnLhtIycU2aAHLWDDRN7c_48cecDozSOAaE",
+    "dq": "Xt2MW6amb1sPQOLequu2-SfxWzww-_uBx2X073jy8bLClRDAcwqV-nUeXytA7azOOJFBV3_HTS9LCqWYgftHBZ8GzWbcAaa_jjqiD0Mm1oA8QOS8ogbYOAVpYoSmgoidwNJPOYXzt9Rtk8nHmJcO1MK84l48MmBb-EV5KGiekZE",
+    "qi": "uV_-AMMxzoFvR4RnGNGl2hDu-B_i-TIZq6KzKm2aTeyHHRBaXsL8x89RxT_YyK229joSGt2ghFWCQwznjMMqDi0ChDPBrkyAbQghkqN55EbUcH-8Hsv_PjTZ9RWmP-TOkbRWXw80aEwFW95CoBaZcF99UcYCZyHGXS7z25bqGdE",
+    "kid": "Q1SnNeCviHDNrGSt9fMI7Vic5S28ECdW8vJgQI5EIp0"
+  },
+  "encryptionPublic": {
+    "kty": "RSA",
+    "n": "x3XH8bkeCeORdnz8cG-RifH_gUuVEqOE7pfd0DpW3_qGWQR4SbxTj8ti4zw7tgIIV4_8DzBdEJXiECdEbTwz8guA0ERn2ZLDZsojFFfx1ei_DdJ7Yo4TzJQumke-QW5KmrWF_k1cXoBEaF-mby7Deu0FgIjHBRvbjAdHR4kEjVBy4gH1WUaCw_hdG9HWWhoM_q-RYUJklDeEoKd0kR4L6Emw_47SM2bh2VThBJDSVU0pxR2oDon2DFVcGCMmIQO7ix5VN9kV-Q-EbELvJAQC14Ud8D5xjW6dauxxp3gn1CNZWKxk8iACHChwp9jHHOo_iQM-PC5l9fmux4ur6IV-DQ",
+    "e": "AQAB",
+    "kid": "Q1SnNeCviHDNrGSt9fMI7Vic5S28ECdW8vJgQI5EIp0"
+  },
+  "envelope": {
+    "context": {
+      "version": 1,
+      "direction": "request",
+      "requestId": "00000000-0000-4000-8000-000000000001",
+      "sender": "RJRy9MwpNUweOf1HCRXMOBlK3mJhxZotSN2ho1tIYvA",
+      "recipient": "Q1SnNeCviHDNrGSt9fMI7Vic5S28ECdW8vJgQI5EIp0",
+      "pairingEpoch": "00000000-0000-4000-8000-000000000002",
+      "issuedAt": 1700000000,
+      "expiresAt": 1700000300
+    },
+    "jwe": "eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2R0NNIiwiY3R5IjoiYWd3K2p3cyIsImtpZCI6IlExU25OZUN2aUhETnJHU3Q5Zk1JN1ZpYzVTMjhFQ2RXOHZKZ1FJNUVJcDAifQ.AYx3Xx-PWE3rTQO8gmmITLDD1HRecnrJC9FTKJ976mp5uC26p4UrtXIE5cONGE4vwxK5iZ-YiAnYBkpUyy7tx7EoQ3CunGD_mPfRkWLnd69wAw2f5lgDtEEwDmytWJx0IeG-SHONFwVh14cQxN84g0UCndIs1qpxBLRxFdNo04wKEBceU4FL7FFOisu3fUSwOsWW_gNh9T58746B3i-dWJZhGrNGvIub4kKp25mfPjad7iAk5Cn4SVQ0X_-XzqvFtuafmfRpI74pD-o3WeV_35sFFmWbYJjBkPhPzYONfTM96kbZIK7cVVV_wel4gjpEUYX6jJiw74hc7vIHQ5xPew.PneQFfrcQKuJ5vmk.iMU1yq-af8JQF8DSnRKdg4q6_Hn0MqaAB6NphlJ5WUnY6-UP3IgAHEXc6VLzGVlzlXAUa7CfCWgAPZOXGE88_EuKQC0eHcT6eh7MMxOpObWX3ea6IOFRVLzRto5TnKySXb8lBwMmHI6PVXUJ1we2zoGJqUsBSmF42RvwRlLa_xCPdoqFKEXD4vwQWnf-YUtbl7CLTSXgpfneXbvy9WJ0SlqkKOLUk1OBLKcLXI5xmWTzwn2IoiE6gs7ijmpTiNBbCYtZUwzvDrdF1PhUOrtPmDyYr4NbnL2mKyHeku6f7ZK0fDhx2O9VdbnDB3GCgeivAeSDEzlE5_9DWRQTZbrJn-v8Wp9QPoqqhn2jjVkQabMfIli2e8btYeMcCY5jNDmLLq4MYhaXMpLcIsre9EenRHkZWECBWUo0R_otYbqzFueAw_wbsg7G2vpc2nq0imWQPBhE55pZLeIOAA4o0pLX4e20UJKs4268xrntJEo-ouKpLx7-jBTbBC5gbL_lc64IMQFLqZJ-0ra131eVVmUE8xi8dsOwR_36Jx7GCRfya7Rx_mD6iK38XhefmzMVDlOTFTIgscJ3wWxHfYJJ8Ot3n4Kbp_tNRZhVxs6Di50qhCcXkyCpL2MtFA1eV7IHIZsADctB2nM1saG2zvV6OFyMBlm8KrGI_dqiXu-OG792bTma3kUP7QW1coQtXeobswuaBOd-xleWdoy0tPRKdsvDKFjBSBbizWGL-lE_VghQdk2rzP_8Y9sFhsY8ybxdPhhv5etZCU8W8rrnLqhenNIZh1JGsVJvG8P5pxXiBFBvb42ENDaEy6J3A8yWAakfVz0b3_LKOUE5efeCvFCBG77QH3A6m0G5AyhZ_Z0_Ws6B1OcLw92gBAveI4zynPE7NBIpSXIFYanLHT8BG8dqgp6O1NSj9gbvV3jezIL0BrpCSWQMKRqDKUjx7d6rlhd3d2ioVOGt2TirzKb8TtJ6rPgPYdpSxoCMlqKVxbIQvghOqEtm_UzrXLxtWM7VhgroAjBlQGoZBB-Xxbb4Yy28epBeTl9QOP-1Nlx8x3r4xoG5P3NDaMThVr9IqyIjlitxrlK66bb_rovmyjNvvIPCFN8zt3WSKw.GnJddj-m39qx-2R0dRDM-g"
+  },
+  "payload": {
+    "source": "gmail",
+    "operation": "search",
+    "query": "invoice",
+    "purpose": "Find receipt",
+    "fields": ["subject"],
+    "since": 1699000000,
+    "until": 1700000000,
+    "maxResults": 5
+  }
+}

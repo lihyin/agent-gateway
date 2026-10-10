@@ -1,0 +1,14 @@
+{
+  "$id": "https://agent-gateway.invalid/protocol/v1/envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["context", "jwe"],
+  "properties": {
+    "context": { "$ref": "https://agent-gateway.invalid/protocol/v1/context" },
+    "jwe": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$",
+      "maxLength": 65000
+    }
+  }
+}

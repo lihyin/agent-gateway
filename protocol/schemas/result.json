@@ -1,0 +1,43 @@
+{
+  "$id": "https://agent-gateway.invalid/protocol/v1/result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "messages"],
+  "properties": {
+    "status": { "enum": ["allowed", "denied", "expired", "error"] },
+    "messages": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "maxLength": 128 },
+          "date": { "type": "integer", "minimum": 0 },
+          "from": { "type": "string", "maxLength": 512 },
+          "subject": { "type": "string", "maxLength": 512 },
+          "snippet": { "type": "string", "maxLength": 1024 }
+        }
+      }
+    },
+    "error": {
+      "enum": [
+        "invalid_request",
+        "expired",
+        "replay",
+        "unpaired",
+        "denied",
+        "source_unavailable",
+        "transport_failed"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "enum": ["denied", "expired", "error"] } }
+      },
+      "then": { "properties": { "messages": { "maxItems": 0 } } }
+    }
+  ]
+}

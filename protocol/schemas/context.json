@@ -1,0 +1,25 @@
+{
+  "$id": "https://agent-gateway.invalid/protocol/v1/context",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "direction",
+    "requestId",
+    "sender",
+    "recipient",
+    "pairingEpoch",
+    "issuedAt",
+    "expiresAt"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "direction": { "enum": ["request", "result"] },
+    "requestId": { "type": "string", "format": "uuid" },
+    "sender": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "recipient": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "pairingEpoch": { "type": "string", "format": "uuid" },
+    "issuedAt": { "type": "integer", "minimum": 0 },
+    "expiresAt": { "type": "integer", "minimum": 0 }
+  }
+}

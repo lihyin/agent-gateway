@@ -38,5 +38,11 @@ jobs:
         run: flutter analyze
       - working-directory: mobile
         run: flutter test
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.3"
+          cache: npm
+      - run: npm ci
+      - run: node scripts/verify-dart-crypto.mjs
       - working-directory: mobile
         run: flutter build apk --debug

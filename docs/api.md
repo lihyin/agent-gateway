@@ -10,4 +10,11 @@ Other methods on `/health` return HTTP 405 with `Allow: GET`. All other routes r
 
 The demo agent exposes `GET /health` with `callbackEnabled: false`; unfinished callbacks return HTTP 404 and retain no request bodies. Mock providers expose health and return HTTP 501 for unfinished operations. These services are local scaffolding; no provider integration is implemented.
 
-Versioned encrypted transport schemas and pairing APIs are Day 2–6 work, described in [architecture](architecture.md).
+## Protocol v1 design
+
+Closed request, result, envelope, context, route, acknowledgment, and error schemas
+are in [protocol/](../protocol/README.md). The selected standard nested JOSE
+algorithms and cross-runtime fixture are documented in
+[ADR 002](crypto-design.md). These contracts do not enable relay endpoints;
+pairing, route issuance, persistent replay protection, and forwarding remain
+separate implementation gates.

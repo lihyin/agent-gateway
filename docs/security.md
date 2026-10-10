@@ -28,6 +28,14 @@ Local unpairing immediately denies access on-device, but stateless routing canno
 
 ## Required verification
 
+The protocol design gate selects nested ES256 JWS inside RSA-OAEP-256/A256GCM
+JWE, with separate signing/encryption keys and pinned identities. Public test-only
+fixtures exercise TypeScript-to-Dart and Dart-to-TypeScript interoperability.
+Closed schemas reject unknown fields/versions and bound payload sizes/expiry.
+See [ADR 002](crypto-design.md) for algorithm restrictions, key rotation, and the
+absence of forward secrecy. Fixture success is not implementation of authenticated
+pairing, protected replay state, or secure native key storage.
+
 Test cross-agent/device access, key substitution, context tampering, reflection, replay after restart, revoked pairing, expired approvals, Edit/Always escalation, connector bounds, PII/credential leakage, OAuth redirects/state, callback SSRF, and push/log content. Add cross-runtime crypto fixtures and physical iOS/Android checks for locked/killed apps, secure storage, push delays/duplicates, and biometrics.
 
 The Day 1 runtime exposes health only and rejects unfinished routes. The mobile shell cannot connect accounts or grant access; the demo adapter does not accept callbacks. Release Gradle configuration requires actual signing credentials with no debug-key fallback. CI has read-only repository permissions; production secrets belong only to trusted release jobs and provider settings. The complete private-data security pipeline remains future implementation work, not an implemented or audited guarantee.

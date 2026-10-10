@@ -1,0 +1,11 @@
+{
+  "$id": "https://agent-gateway.invalid/protocol/v1/ack",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "requestId", "status"],
+  "properties": {
+    "version": { "const": 1 },
+    "requestId": { "type": "string", "format": "uuid" },
+    "status": { "enum": ["provider_accepted", "callback_accepted"] }
+  }
+}
