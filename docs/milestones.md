@@ -1,5 +1,12 @@
 # Implementation status
 
+## Meta Muse compatibility gate
+
+Official connector guidance supports API/MCP integrations, but the current
+gateway has no authenticated remote-agent delivery pipeline. The compatibility
+decision and remaining prerequisites are recorded in [Meta Muse](meta-muse.md).
+No live connector, submission, or end-to-end Muse validation is claimed.
+
 ## PR02: protocol and crypto design
 
 Protocol v1 has closed JSON schemas, strict TypeScript validation, bounded

@@ -18,6 +18,7 @@ The plan establishes production delivery on Day 1: Cloudflare relay, GitHub Acti
 - [Day 1 validation status](docs/day1-status.md)
 - [Protocol v1](protocol/README.md)
 - [Device-local Gmail and approval setup](docs/gmail-setup.md)
+- [Meta Muse compatibility and integration prerequisites](docs/meta-muse.md)
 
 ## Local development
 
