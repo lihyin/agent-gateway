@@ -39,9 +39,7 @@ void main() {
       expect(find.text('Agent Gateway'), findsOneWidget);
       expect(find.text('Release: tested-revision'), findsOneWidget);
       expect(
-        find.textContaining(
-          'Agent pairing and transmission are not available yet.',
-        ),
+        find.textContaining('Automatic push delivery is not available.'),
         findsOneWidget,
       );
       await tester.pumpAndSettle();

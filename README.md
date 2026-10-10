@@ -4,7 +4,7 @@ Agent Gateway lets third-party agents such as Meta Muse request controlled acces
 
 The relay has no Gmail tokens, plaintext private data, or payload decryption keys.
 
-The relay remains health-only. The mobile app now includes device-local iOS Gmail sign-in and a bounded local review flow with access consent, minimization, filtering, and Allow/Deny/Edit/Always. Live sign-in requires your public Google iOS OAuth client configuration and physical-device validation. Agent requests and outbound disclosure remain disabled until pairing and encrypted transport are complete. See [Gmail setup](docs/gmail-setup.md) and [milestone status](docs/milestones.md).
+The relay remains health-only. The mobile app includes iOS Gmail sign-in, bounded review with access consent, filtering, and Allow/Deny/Edit/Always, plus authenticated pairing and foreground encrypted request/result transfer to one agent bridge. Automatic push/relay forwarding is not implemented. Live sign-in requires your public Google iOS OAuth client configuration and physical-device validation. See [paired delivery](docs/paired-delivery.md), [Gmail setup](docs/gmail-setup.md), and [milestone status](docs/milestones.md).
 
 The plan establishes production delivery on Day 1: Cloudflare relay, GitHub Actions CI/CD orchestration, Codemagic Android/iOS builds/signing/distribution, and Docker Compose for local development.
 
@@ -19,6 +19,7 @@ The plan establishes production delivery on Day 1: Cloudflare relay, GitHub Acti
 - [Protocol v1](protocol/README.md)
 - [Device-local Gmail and approval setup](docs/gmail-setup.md)
 - [Meta Muse compatibility and integration prerequisites](docs/meta-muse.md)
+- [Pairing and encrypted foreground delivery](docs/paired-delivery.md)
 
 ## Local development
 

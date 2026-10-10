@@ -1,8 +1,9 @@
 # Protocol v1
 
-This contract is a design gate. The production relay remains health-only until
-pairing, protected replay persistence, transport, and the mobile authorization
-pipeline are connected and validated.
+Pairing and nested JOSE support manual foreground request/result transfer through
+the mobile authorization pipeline. The relay remains health-only; signed route
+issuance and automatic push/HTTPS forwarding are not implemented. See
+[paired delivery](../docs/paired-delivery.md).
 
 All times are integer UTC Unix seconds. IDs are opaque UUIDs. Unknown fields and
 versions are rejected. Request lifetime is at most 300 seconds; expiry is exclusive.

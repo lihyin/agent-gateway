@@ -37,7 +37,9 @@
       "if": {
         "properties": { "status": { "enum": ["denied", "expired", "error"] } }
       },
-      "then": { "properties": { "messages": { "maxItems": 0 } } }
+      "then": {
+        "properties": { "messages": { "type": "array", "maxItems": 0 } }
+      }
     }
   ]
 }

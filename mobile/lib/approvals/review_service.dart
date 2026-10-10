@@ -392,6 +392,18 @@ class ReviewService {
     _rules.removeWhere((r) => r['scope'] == scope);
     await _save();
   });
+  Future<ReviewEntry> forRelease(String id, int revision, String digest) =>
+      _serial.run(() async {
+        final e = _entries[id];
+        if (e == null ||
+            ![ReviewState.allowed, ReviewState.denied].contains(e.state) ||
+            e.revision != revision ||
+            e.candidateDigest != digest) {
+          throw const GatewayError('stale_review');
+        }
+        _check(e.request);
+        return e;
+      });
   Future<void> cancelAll() {
     _generation++;
     return _serial.run(() async {

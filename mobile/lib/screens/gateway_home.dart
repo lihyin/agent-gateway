@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../approvals/review_service.dart';
 import '../domain/gateway_configuration.dart';
@@ -21,6 +22,9 @@ class GatewayHome extends StatefulWidget {
 
 class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
   final _query = TextEditingController(), _purpose = TextEditingController();
+  final _offer = TextEditingController(),
+      _fingerprint = TextEditingController(),
+      _envelope = TextEditingController();
   Timer? _expiry;
   bool _sensitive = false, _obscured = false;
   @override
@@ -53,6 +57,9 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
     _expiry?.cancel();
     _query.dispose();
     _purpose.dispose();
+    _offer.dispose();
+    _fingerprint.dispose();
+    _envelope.dispose();
     super.dispose();
   }
 
@@ -142,8 +149,10 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Device-owner preview',
+            Text(
+              entry.request.agentId == 'device-owner'
+                  ? 'Device-owner preview'
+                  : 'Paired agent: ${entry.request.agentId}',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             Text('Purpose: ${entry.request.purpose}'),
@@ -220,8 +229,19 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                 ],
               ),
             if (entry.state == ReviewState.allowed && !expired)
-              const Text(
-                'Approved locally. No data has been transmitted to an agent.',
+              Text(
+                entry.request.agentId == 'device-owner'
+                    ? 'Approved locally. No data has been transmitted to an agent.'
+                    : 'Approved for the paired agent. Export the encrypted result to deliver it.',
+              ),
+            if (!expired &&
+                entry.request.agentId != 'device-owner' &&
+                [ReviewState.allowed, ReviewState.denied].contains(entry.state))
+              FilledButton(
+                onPressed: busy
+                    ? null
+                    : () => widget.controller.exportEncrypted(entry),
+                child: const Text('Export encrypted result'),
               ),
           ],
         ),
@@ -250,7 +270,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'Connect Gmail to review a bounded preview on this device. Agent pairing and transmission are not available yet.',
+                      'Connect Gmail to review a bounded preview. Pair an agent for foreground encrypted request/result transfer. Automatic push delivery is not available.',
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -294,6 +314,70 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                         onPressed: c.initialize,
                         child: const Text('Retry secure storage'),
                       ),
+                    if (c.delivery != null) ...[
+                      const SizedBox(height: 24),
+                      const Text('Authenticated agent pairing'),
+                      if (c.delivery!.agentId == null) ...[
+                        TextField(
+                          controller: _offer,
+                          maxLength: 5000,
+                          decoration: const InputDecoration(
+                            labelText: 'Signed agent pairing offer',
+                          ),
+                        ),
+                        TextField(
+                          controller: _fingerprint,
+                          maxLength: 64,
+                          decoration: const InputDecoration(
+                            labelText:
+                                'Agent fingerprint from trusted terminal',
+                          ),
+                        ),
+                        const Text(
+                          'Compare the full fingerprint with your agent terminal through a trusted channel. Never trust a fingerprint supplied by an unknown request.',
+                        ),
+                        FilledButton(
+                          onPressed: c.busy || !c.ready
+                              ? null
+                              : () => c.pair(_offer.text, _fingerprint.text),
+                          child: const Text('Verify and pair agent'),
+                        ),
+                      ] else ...[
+                        Text(
+                          'Agent fingerprint: ${c.delivery!.agentFingerprint}',
+                        ),
+                        Text(
+                          'Device fingerprint: ${c.delivery!.deviceFingerprint}',
+                        ),
+                        TextButton(
+                          onPressed: c.busy ? null : c.unpair,
+                          child: const Text('Unpair agent'),
+                        ),
+                        TextField(
+                          controller: _envelope,
+                          maxLength: 3500,
+                          decoration: const InputDecoration(
+                            labelText: 'Encrypted request envelope',
+                          ),
+                        ),
+                        FilledButton(
+                          onPressed: c.busy || !c.ready || !c.connected
+                              ? null
+                              : () => c.importEncrypted(_envelope.text),
+                          child: const Text('Import encrypted request'),
+                        ),
+                      ],
+                      if (c.exported != null) ...[
+                        const Text('Pairing receipt or encrypted result'),
+                        SelectableText(c.exported!),
+                        TextButton(
+                          onPressed: () => Clipboard.setData(
+                            ClipboardData(text: c.exported!),
+                          ),
+                          child: const Text('Copy encrypted transfer'),
+                        ),
+                      ],
+                    ],
                     const SizedBox(height: 24),
                     TextField(
                       controller: _query,
@@ -374,6 +458,12 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
       'Use a bounded query and purpose; this request may have expired.',
     'query_scope_denied' =>
       'Wildcards and query-supplied date overrides are not supported.',
+    'invalid_pairing' => 'Pairing failed. Check the full fingerprint and use a fresh signed offer.',
+    'invalid_envelope' =>
+      'Encrypted transfer is invalid or exceeds its size limit.',
+    'unpaired' => 'The request does not match the current paired agent.',
+    'replay_changed_content' =>
+      'This request identity was already used or its content changed.',
     _ =>
       'The operation could not complete safely. Try again or reconnect Gmail.',
   };

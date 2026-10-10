@@ -9,6 +9,7 @@ import '../connectors/gmail_connector.dart';
 import '../domain/gateway_configuration.dart';
 import '../domain/gateway_error.dart';
 import '../domain/gmail_request.dart';
+import '../transport/paired_delivery.dart';
 import '../vault/vault.dart';
 
 class GatewayController extends ChangeNotifier {
@@ -16,26 +17,35 @@ class GatewayController extends ChangeNotifier {
     required this.session,
     required this.review,
     required this.gmailConfigured,
+    this.delivery,
   });
   factory GatewayController.device(GatewayConfiguration configuration) {
     final vault = DeviceVault();
     final oauth = GmailOAuthConfiguration(configuration.googleIosClientId);
     final session = GmailSession(vault, NativeGmailOAuth(oauth));
+    final delivery = PairedDelivery(
+      vault: vault,
+      confirmation: DeviceConfirmation(),
+    );
     final review = ReviewService(
       vault: vault,
       source: GmailConnector(session),
       confirmation: DeviceConfirmation(),
-      currentEpoch: (id) => id == 'device-owner' ? 'local-preview-v1' : null,
+      currentEpoch: (id) =>
+          id == 'device-owner' ? 'local-preview-v1' : delivery.epoch(id),
     );
     return GatewayController(
       session: session,
       review: review,
       gmailConfigured: oauth.isValid,
+      delivery: delivery,
     );
   }
   final GmailSession session;
   final ReviewService review;
   final bool gmailConfigured;
+  final PairedDelivery? delivery;
+  String? exported;
   bool connected = false, busy = false, ready = false;
   String? error;
   List<ReviewEntry> entries = [];
@@ -70,6 +80,7 @@ class GatewayController extends ChangeNotifier {
   }
 
   Future<void> initialize() => _run(() async {
+    await delivery?.initialize();
     await review.initialize();
     connected = await session.isConnected();
     ready = true;
@@ -157,8 +168,33 @@ class GatewayController extends ChangeNotifier {
   });
   void obscure() {
     entries = [];
+    exported = null;
     _notify();
   }
+
+  Future<void> pair(String offer, String fingerprint) => _run(() async {
+    if (delivery == null) throw const GatewayError('invalid_pairing');
+    exported = await delivery!.pair(offer.trim(), fingerprint);
+  });
+  Future<void> unpair() => _run(() async {
+    await delivery?.unpair();
+    exported = null;
+    await review.cancelAll();
+    await _reload();
+  });
+  Future<void> importEncrypted(String envelope) => _run(() async {
+    if (!connected || delivery == null) {
+      throw const GatewayError('gmail_disconnected');
+    }
+    exported = null;
+    await delivery!.importRequest(envelope.trim(), review);
+    await _reload();
+  });
+  Future<void> exportEncrypted(ReviewEntry entry) => _run(() async {
+    exported = null;
+    if (delivery == null) throw const GatewayError('invalid_envelope');
+    exported = await delivery!.exportResult(entry, review);
+  });
 
   @override
   void dispose() {

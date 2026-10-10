@@ -34,8 +34,8 @@ or device confirmation. The phone must identify the actual disclosure recipient.
 
 ## Current blockers
 
-- Mobile recognizes only the device-owner preview identity; remote agents are denied.
-- Protected device payload keys and authenticated pairing are not implemented.
+- Pairing and protected device keys support manual encrypted foreground transfer;
+  a hosted bridge/automatic transport is not yet implemented.
 - Relay request delivery/push, encrypted result handoff, and authenticated agent
   callbacks are not implemented. The demo adapter exposes health only.
 - Muse connector authentication, asynchronous completion, timeout, cancellation,
@@ -47,7 +47,7 @@ Do not register the production health URL as a working Gmail connector. No live
 integration or connector submission has been performed. Existing demo scaffolding
 and device-local Gmail review remain the supported baseline.
 
-## Proposed bridge contract, not deployed
+## Bridge contract and remaining Muse integration
 
 1. A bounded Gmail preview tool accepts query, purpose, requested fields, date
    range, maximum results, and expiry. It never accepts Google credentials,
@@ -75,5 +75,6 @@ and device-local Gmail review remain the supported baseline.
 - Test a dedicated Gmail account on a physical iPhone before enabling real users.
 
 See [protocol](../protocol/README.md), [security](security.md), and
-[Gmail acceptance](gmail-setup.md). The next implementation dependency is
-protected device keys and authenticated pairing, not connector publication.
+[Gmail acceptance](gmail-setup.md). Automatic transport and hosted connector
+authentication remain prerequisites for connector publication. See
+[foreground pairing/delivery](paired-delivery.md).

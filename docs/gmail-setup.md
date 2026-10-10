@@ -1,10 +1,10 @@
 # Device-local Gmail and review
 
-This build adds iOS Gmail sign-in and a user-initiated, device-local review flow.
-It does not yet receive agent requests or transmit approved data. Production relay
-routes remain health-only. The verified-pairing resolver is a dependency boundary;
-the shipped app recognizes only its device-owner preview identity, never network
-claims about an agent. Mock tests use synthetic agents/data.
+This build supports iOS Gmail sign-in, local previews, and fingerprint-paired
+agent requests through manual foreground encrypted transfer. Approved results
+can be exported encrypted for that agent. Relay routes remain health-only.
+See [paired delivery](paired-delivery.md). Live provider/device acceptance remains
+required; mocked tests use synthetic agents/data.
 
 ## Google setup
 
@@ -77,7 +77,7 @@ can fail offline: local credentials are still deleted, and the app instructs the
 user to remove the grant in Google account settings. No live provider/device
 acceptance is claimed from mocked tests.
 
-To enable actual agent delivery, finish authenticated pairing, protected device
-keys/replay persistence, stateless encrypted transport/push, and encrypted result
-handoff, then exercise the same domain pipeline. No fallback plaintext upload,
-server OAuth vault, or web approval authority is provided.
+Automatic delivery still requires routing capabilities, relay transport/push,
+and verified HTTPS callbacks. Manual encrypted transfer uses the same domain
+pipeline. No plaintext upload, server OAuth vault, or web approval authority is
+provided.
