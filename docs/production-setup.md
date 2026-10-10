@@ -49,7 +49,7 @@ The configured workflow builds a signed AAB and publishes to the internal track.
 4. Set the numeric App Store Connect app ID as `APP_STORE_ID` in `production_mobile`.
    For Gmail, also set the public `GOOGLE_IOS_CLIENT_ID` in that group and follow
    [device-local Gmail setup](gmail-setup.md). Never add an OAuth client secret.
-5. Create the TestFlight group `Agent Gateway Internal`, add testers, and complete required app/export-compliance/beta information. Confirm the selected group supports the intended internal/external tester flow; external beta review may delay access.
+5. Create the internal TestFlight group `Agent Gateway Internal`, add testers, and complete required app/export-compliance/beta information. Enable automatic distribution in App Store Connect to let Apple assign new builds. Codemagic does not explicitly assign this group: Apple's API rejects that operation for automatically managed internal groups. If the group uses manual distribution, add the processed build in App Store Connect yourself. External beta review may delay access.
 
 The workflow uploads a signed IPA and requests TestFlight distribution, without public App Store submission. The orchestrator also waits for v3 `app_store_connect_status` to finish. If that status is missing, fails, or times out, delivery fails closed. Actual tester visibility and installation still require checking TestFlight and the physical device; API completion cannot prove installation.
 

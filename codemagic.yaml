@@ -114,5 +114,6 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
-        beta_groups: [Agent Gateway Internal]
+        # Apple manages automatically distributed internal groups. Explicitly
+        # assigning such a group fails after successful upload/processing.
         submit_to_app_store: false
