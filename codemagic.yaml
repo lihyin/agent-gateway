@@ -97,13 +97,17 @@ workflows:
         script: |
           set -eu
           xcode-project use-profiles
+      - name: Configure device-local Gmail OAuth
+        script: |
+          set -eu
+          dart scripts/configure-ios-oauth.dart
       - name: Build signed iOS archive
         script: |
           set -eu
           cd mobile
           LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_ID")
           BUILD_NUMBER=$((LATEST + 1))
-          flutter build ipa --release --build-number="$BUILD_NUMBER" --export-options-plist=/Users/builder/export_options.plist --dart-define=RELAY_URL="$RELAY_URL" --dart-define=RELEASE_SHA="$EXPECTED_REVISION" --dart-define=ENVIRONMENT=production
+          flutter build ipa --release --build-number="$BUILD_NUMBER" --export-options-plist=/Users/builder/export_options.plist --dart-define=RELAY_URL="$RELAY_URL" --dart-define=RELEASE_SHA="$EXPECTED_REVISION" --dart-define=ENVIRONMENT=production --dart-define=GOOGLE_IOS_CLIENT_ID="${GOOGLE_IOS_CLIENT_ID:-}"
     artifacts:
       - mobile/build/ios/ipa/*.ipa
     publishing:

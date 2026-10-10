@@ -17,6 +17,8 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.deepshareai.agentgateway"
+        // Gmail OAuth is iOS-only in this milestone; no Android Google client is embedded.
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.deepshareai.agentgateway.oauth-disabled"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

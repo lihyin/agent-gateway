@@ -22,3 +22,15 @@ API, and configured OAuth test users. Implementation and mock tests can proceed
 without those public configuration values. Agent disclosure remains disabled
 until authenticated pairing, encrypted transport, replay persistence, and result
 handoff are connected and verified.
+
+## Gmail and approval implementation
+
+Implemented native iOS AppAuth sign-in/refresh/revocation, device-only secure
+vault, bounded direct Gmail metadata search, access consent, minimization/PII
+filtering, persistent replay/review state, Allow/Deny/Edit/Always with exact-scope
+revocable rules, high-risk local authentication, and a mobile review UI.
+The UI is explicitly device-owner preview mode; actual agents cannot initiate
+retrieval or receive data. Negative tests cover policy bounds, revocation/expiry,
+disconnect races, replay/restart, stale actions, edits, and rule escalation.
+Live Google client configuration, iOS native build, and physical-device checks
+remain required before live acceptance. See [setup and acceptance](gmail-setup.md).

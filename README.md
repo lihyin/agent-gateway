@@ -4,7 +4,7 @@ Agent Gateway lets third-party agents such as Meta Muse request controlled acces
 
 The relay has no Gmail tokens, plaintext private data, or payload decryption keys.
 
-The Day 1 foundation includes a health-only Worker, Flutter Android/iOS shell, local mock services, and delivery workflows. Private-data access is disabled. Live deployment and signed distribution depend on completing the account setup below; they are not established by the configuration files.
+The relay remains health-only. The mobile app now includes device-local iOS Gmail sign-in and a bounded local review flow with access consent, minimization, filtering, and Allow/Deny/Edit/Always. Live sign-in requires your public Google iOS OAuth client configuration and physical-device validation. Agent requests and outbound disclosure remain disabled until pairing and encrypted transport are complete. See [Gmail setup](docs/gmail-setup.md) and [milestone status](docs/milestones.md).
 
 The plan establishes production delivery on Day 1: Cloudflare relay, GitHub Actions CI/CD orchestration, Codemagic Android/iOS builds/signing/distribution, and Docker Compose for local development.
 
@@ -16,6 +16,8 @@ The plan establishes production delivery on Day 1: Cloudflare relay, GitHub Acti
 - [Production account setup and delivery](docs/production-setup.md)
 - [Day 1 API](docs/api.md)
 - [Day 1 validation status](docs/day1-status.md)
+- [Protocol v1](protocol/README.md)
+- [Device-local Gmail and approval setup](docs/gmail-setup.md)
 
 ## Local development
 

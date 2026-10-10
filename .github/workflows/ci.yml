@@ -33,7 +33,7 @@ jobs:
       - working-directory: mobile
         run: flutter pub get
       - working-directory: mobile
-        run: dart format --output=none --set-exit-if-changed lib test
+        run: dart format --output=none --set-exit-if-changed lib test ../scripts/configure-ios-oauth.dart
       - working-directory: mobile
         run: flutter analyze
       - working-directory: mobile
