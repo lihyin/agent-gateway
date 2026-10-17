@@ -1,6 +1,9 @@
 import { directFetch, type DirectEnvironment } from "./direct.js";
+import { pairingFetch, type PairingEnvironment } from "./pairing.js";
+export { PairingChannel } from "./pairing.js";
 export { RequestChannel } from "./channel.js";
-export interface RelayEnvironment extends DirectEnvironment {
+export interface RelayEnvironment
+  extends DirectEnvironment, PairingEnvironment {
   ENVIRONMENT?: string;
   RELEASE_SHA?: string;
 }
@@ -11,6 +14,7 @@ export default {
       "X-Content-Type-Options": "nosniff",
     };
     const path = new URL(request.url).pathname;
+    if (path.startsWith("/v1/pairing/")) return pairingFetch(request, env);
     if (["/v1/routes", "/v1/requests", "/v1/results"].includes(path))
       return directFetch(request, env);
     if (path !== "/health")

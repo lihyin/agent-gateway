@@ -5,7 +5,10 @@ Enter secrets directly in provider settings, never in chat or committed files. C
 Current transport uses the existing Cloudflare relay only; no bridge server/domain
 is required. Before enabling APNs, follow [relay-only setup](remote-delivery.md)
 for push capability/profile prerequisites, Worker secrets, public pairing pins,
-the internal live-channel migration, and Muse-runtime client installation.
+the internal live-channel migrations, and Muse-runtime client installation.
+The [one-time-code pairing flow](pin-pairing.md) additionally needs the `PAIRINGS`
+binding and `v2-pairing` migration plus matching phone/client versions. Codemagic
+installs Node dependencies before Flutter tests for Dart/Node interoperability.
 Day 1 health-only evidence below is historical and does not establish new push acceptance.
 
 ## 1. Git identity and repository

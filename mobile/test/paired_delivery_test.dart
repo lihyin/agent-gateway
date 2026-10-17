@@ -120,6 +120,15 @@ void main() {
       await expectLater(pair(), throwsA(anything));
     },
   );
+  test('cancelled pairing cannot commit after local authentication', () async {
+    await expectLater(
+      delivery.pair(f['offer'], f['fingerprint'], stillAuthorized: () => false),
+      throwsA(anything),
+    );
+    expect(confirmation.count, 1);
+    expect(delivery.agentId, isNull);
+    expect(vault.values['transport.pair'], isNull);
+  });
   test('expired offers and substituted encryption keys fail', () async {
     now = now.add(const Duration(seconds: 300));
     await expectLater(pair(), throwsA(anything));

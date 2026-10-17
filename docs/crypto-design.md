@@ -23,7 +23,7 @@ Verify pinned recipient/header algorithms, decrypt, verify the pinned sender
 signature, validate the closed payload schema, compare all authenticated context,
 check pairing epoch and expiry, then persist replay reservation before policy.
 Authenticated context includes direction to prevent request/result reflection.
-Key IDs are RFC 7638 public JWK SHA-256 thumbprints. The user verifies the full
+Key IDs are RFC 7638 public JWK SHA-256 thumbprints. The default [one-time-code flow](pin-pairing.md) authenticates signed offers/receipts with library SRP-6a and JOSE key confirmation, followed by phone approval and local authentication. It uses PointyCastle 4.0.0 and fast-srp-hap 2.0.4 with fixed RFC 5054 2048-bit group/SHA-256 parameters. In the advanced fallback the user verifies the full
 pairing fingerprint out of band; neither a relay response nor an imported key is
 trusted automatically. Rotation creates a new confirmed pairing epoch and
 invalidates outstanding local approvals/rules. Private keys stay in the device

@@ -5,6 +5,16 @@ policy, reviews and approvals are phone-owned. No additional server is deployed.
 All routes require the configured exact HTTPS origin and reject browser Origin
 headers and URL query parameters. Private routes fail closed when unconfigured.
 
+Pairing adds `GET /v1/pairing/<session>/device` and `/agent`, WebSocket upgrades
+only. The session is 64 lowercase hex characters from 32 random bytes, distinct
+from the secret PIN. These paths require `PAIRINGS` and `RELAY_ORIGIN`, but do not
+require or modify `PAIRING_CONFIG`. One phone and one agent exchange public SRP
+values and encrypted signed offers/receipts for at most five minutes. Endpoints,
+not the relay, authenticate the code and approve pairing. See the full
+[PIN protocol](pin-pairing.md). Invalid upgrades/Origin/query return 400;
+missing/used rooms or duplicate peers return 409; disabled/malformed paths return 404. Excess frames, binary/oversize frames, disconnect or expiry close both
+sockets. There is no reconnect/resume, polling or offline pairing queue.
+
 | Endpoint           | Authentication and behavior                                                                                                                                                                                                                                                                    |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /health`      | Existing public service/environment/revision health; `sourceAccessEnabled` remains false because the relay cannot access sources.                                                                                                                                                              |

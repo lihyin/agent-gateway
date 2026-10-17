@@ -22,7 +22,7 @@ agent-local status while maintaining outbound sockets; it opens no HTTP listener
 
 Required real-account validation: ability to install/run the client with Node 22,
 maintain outbound authenticated WebSockets, retain private agent state, finish
-fingerprint pairing, provide bounded request IDs/arguments and resume status after
+one-time-code pairing, provide bounded request IDs/arguments and resume status after
 human review. Lost sockets retry the original envelope before five-minute expiry.
 Muse's permissions supplement phone approval and cannot bypass it.
 

@@ -11,6 +11,7 @@ import '../domain/gateway_error.dart';
 import '../domain/gmail_request.dart';
 import '../transport/paired_delivery.dart';
 import '../transport/foreground_relay.dart';
+import '../transport/pin_pairing.dart';
 import '../vault/vault.dart';
 
 class GatewayController extends ChangeNotifier {
@@ -51,6 +52,29 @@ class GatewayController extends ChangeNotifier {
   final bool gmailConfigured;
   final PairedDelivery? delivery;
   final ForegroundRelay? relay;
+  PinPairing? pinPairing;
+  Future<void> startPinPairing(Future<bool> Function() confirm) =>
+      _run(() async {
+        if (relay == null || delivery == null || delivery!.agentId != null) {
+          throw const GatewayError('relay_configuration_required');
+        }
+        pinPairing?.close();
+        final pairing = PinPairing(
+          PinExchange(relay!.origin),
+          delivery!,
+          changed: _notify,
+          confirm: confirm,
+        );
+        pinPairing = pairing;
+        exported = null;
+        await pairing.start();
+      });
+  void cancelPinPairing() {
+    pinPairing?.close();
+    pinPairing = null;
+    _notify();
+  }
+
   bool foreground = true;
   bool get relayEnabled =>
       relay != null && (delivery?.relayEnabled(relay!.origin) ?? false);
@@ -211,10 +235,12 @@ class GatewayController extends ChangeNotifier {
   }
 
   Future<void> pair(String offer, String fingerprint) => _run(() async {
+    cancelPinPairing();
     if (delivery == null) throw const GatewayError('invalid_pairing');
     exported = await delivery!.pair(offer.trim(), fingerprint);
   });
   Future<void> unpair() => _run(() async {
+    cancelPinPairing();
     await delivery?.unpair();
     exported = null;
     await review.cancelAll();
@@ -237,6 +263,7 @@ class GatewayController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    pinPairing?.close();
     super.dispose();
     relay?.close();
   }

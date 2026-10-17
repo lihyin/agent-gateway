@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agentgateway/main.dart';
@@ -5,10 +8,91 @@ import 'package:agentgateway/approvals/review_service.dart';
 import 'package:agentgateway/connectors/gmail_auth.dart';
 import 'package:agentgateway/domain/gateway_configuration.dart';
 import 'package:agentgateway/screens/gateway_controller.dart';
+import 'package:agentgateway/transport/paired_delivery.dart';
+import 'package:agentgateway/transport/foreground_relay.dart';
+import 'package:agentgateway/transport/pin_pairing.dart';
 
 import 'support/fakes.dart';
 
 void main() {
+  testWidgets(
+    'pairing shows one-time setup and keeps manual pairing advanced',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1000, 2600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final now = DateTime.now();
+      final vault = MemoryVault();
+      final fixture = jsonDecode(
+        File('../protocol/fixtures/pairing.json').readAsStringSync(),
+      );
+      final delivery = PairedDelivery(
+        vault: vault,
+        confirmation: FakeConfirmation(),
+        keyGenerator: () async => Map<String, dynamic>.from(fixture['device']),
+      );
+      final controller = GatewayController(
+        session: GmailSession(vault, FakeOAuth(() => now)),
+        review: ReviewService(
+          vault: vault,
+          source: FakeSource(() => now),
+          confirmation: FakeConfirmation(),
+          currentEpoch: (_) => null,
+        ),
+        gmailConfigured: true,
+        delivery: delivery,
+        relay: ForegroundRelay('https://relay.example.com'),
+      );
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        GatewayApp(
+          configuration: const GatewayConfiguration(
+            environment: 'test',
+            revision: 'test',
+            relayUrl: 'https://relay.example.com',
+          ),
+          controller: controller,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Pair with Muse'), findsOneWidget);
+      expect(find.text('Advanced: manual pairing'), findsOneWidget);
+      expect(
+        find.widgetWithText(TextField, 'Signed agent pairing offer'),
+        findsNothing,
+      );
+      final exchange = PinExchange('https://relay.example.com');
+      controller.pinPairing = PinPairing(
+        exchange,
+        delivery,
+        changed: () {},
+        confirm: () async => true,
+      )..status = 'waiting';
+      await controller.reload();
+      await tester.pumpAndSettle();
+      expect(find.text('Copy setup message'), findsOneWidget);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      expect(controller.pinPairing, isNotNull);
+      expect(delivery.agentId, isNull);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          '${exchange.code.substring(0, 4)} ${exchange.code.substring(4)}',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Cancel pairing'));
+      await tester.pumpAndSettle();
+      expect(find.text('Copy setup message'), findsNothing);
+      expect(controller.pinPairing, isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
   testWidgets(
     'Gmail UI connects, requires fetch consent, shows filtered preview and allows once',
     (tester) async {

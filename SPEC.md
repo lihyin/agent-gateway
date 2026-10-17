@@ -14,7 +14,7 @@ The app calls Gmail, Drive, and eventually Calendar directly, evaluates local po
 
 Production delivery starts on Day 1 with a Cloudflare health-only relay and signed mobile shells distributed through Codemagic. GitHub Actions orchestrates checks, relay deployment, and mobile delivery; Docker Compose provides the local relay/mock/demo-agent development environment. Private-data functionality is enabled only after its security pipeline is complete.
 
-- Authenticated pairing of one device with a demo agent.
+- Authenticated pairing of one device with an agent using an eight-digit one-time code, a relay-coordinated SRP exchange, and phone confirmation/authentication. The signed manual fingerprint flow remains an advanced fallback; no additional server is introduced.
 - Device-local Gmail OAuth and connector execution.
 - Encrypted APNs requests and signed HTTPS result submissions returned to the original Muse outbound socket.
 - Deterministic local authorization, bounded retrieval, minimization, and PII filtering.

@@ -36,13 +36,13 @@ jobs:
         run: dart format --output=none --set-exit-if-changed lib test ../scripts/configure-ios-oauth.dart
       - working-directory: mobile
         run: flutter analyze
-      - working-directory: mobile
-        run: flutter test
       - uses: actions/setup-node@v4
         with:
           node-version: "22.23.3"
           cache: npm
       - run: npm ci
+      - working-directory: mobile
+        run: flutter test
       - run: node scripts/verify-dart-crypto.mjs
       - run: node --import tsx scripts/verify-dart-pairing.mjs
       - run: node --import tsx scripts/verify-dart-direct.mjs

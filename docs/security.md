@@ -17,6 +17,26 @@ reservation precedes retrieval. Changed ciphertext under one ID fails closed.
 Release rechecks approval revision/digest, pairing and expiry. Retries reuse saved
 encrypted results and cannot repeat source access.
 
+## One-time-code pairing
+
+The default [pairing flow](pin-pairing.md) uses a five-minute, single-attempt
+eight-digit PIN with library SRP-6a, followed by role/session/origin/expiry-bound
+JOSE records carrying the existing signed offer and receipt. Device confirmation
+and local authentication precede pinning. A random session address, separate from
+the PIN, enters relay URLs. The trusted Muse setup message contains the PIN;
+it must not enter logs, shell arguments or public chat. The relay never receives
+the PIN, verifier, shared key or private endpoint keys. Manual full-fingerprint
+comparison remains an advanced fallback.
+
+`PairingChannel` adds bounded live forwarding inside the existing relay, with
+two sockets, at most five 8192-byte frames per peer and a five-minute timer.
+No Storage API, hibernation attachment or durable pairing mailbox is used. The
+phone independently enforces one proof/sequence/expiry against a malicious relay.
+Resets and disconnects need a fresh code; interrupted final handoff may require
+unpairing both endpoints. Pairing sends no push and grants no Gmail access.
+Operator `PAIRING_CONFIG` and sealed route setup remain separate. Global abuse
+quotas and physical-device acceptance remain operational checks. No audit is claimed.
+
 ## Relay-only transport
 
 The operator pins one paired device/agent's public signing keys and epoch in

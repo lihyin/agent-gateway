@@ -85,7 +85,11 @@ export class Bridge {
       };
     });
   }
-  accept(receipt: string, expectedDeviceFingerprint: string): Promise<void> {
+  accept(
+    receipt: string,
+    expectedDeviceFingerprint: string,
+    stillAuthorized?: () => boolean,
+  ): Promise<void> {
     return this.run(async () => {
       if (this.state.pairing || !this.state.offer || receipt.length > 5000)
         throw new Error("invalid_pairing");
@@ -157,6 +161,8 @@ export class Bridge {
       );
       await importJWK(identity.signing, "ES256");
       await importJWK(identity.encryption, "RSA-OAEP-256");
+      if (stillAuthorized && !stillAuthorized())
+        throw new Error("invalid_pairing");
       this.state.pairing = { identity, epoch: verified.epoch as string };
       delete this.state.offer;
       await this.persist();

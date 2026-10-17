@@ -1,5 +1,12 @@
 # Implementation status
 
+One-time-code pairing is implemented with Node/Dart SRP interoperability, a
+bounded `PairingChannel` inside the existing relay, phone confirmation and local
+authentication. Signed offers/receipts transfer automatically; manual pairing
+remains advanced fallback. See [PIN pairing](pin-pairing.md). Deploy the migration
+and matching app/client before use. Operator transport pins and route transfer
+remain separate; physical iPhone/Muse acceptance requires live verification.
+
 ## Meta Muse compatibility gate
 
 An official-SDK stdio MCP server exposes bounded preview requests, status and

@@ -34,3 +34,19 @@ class_name = "RequestChannel"
 [env.production.vars]
 ENVIRONMENT = "production"
 RELEASE_SHA = "unconfigured"
+
+[[migrations]]
+tag = "v2-pairing"
+new_sqlite_classes = ["PairingChannel"]
+
+[[env.local.durable_objects.bindings]]
+name = "PAIRINGS"
+class_name = "PairingChannel"
+
+[[env.staging.durable_objects.bindings]]
+name = "PAIRINGS"
+class_name = "PairingChannel"
+
+[[env.production.durable_objects.bindings]]
+name = "PAIRINGS"
+class_name = "PairingChannel"

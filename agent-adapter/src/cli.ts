@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { openBridge } from "./store.js";
 import { relayRequest } from "./relay-client.js";
+import { createInterface } from "node:readline/promises";
+import { pairWithCode, parsePairingSetup } from "./pin-pairing.js";
 
 const path = process.env.GATEWAY_AGENT_STATE;
 if (!path)
@@ -12,6 +14,25 @@ try {
   const [command, input, fingerprint] = process.argv.slice(2);
   let result: unknown;
   switch (command) {
+    case "pair": {
+      const lines = createInterface({ input: process.stdin, terminal: false });
+      process.stderr.write(
+        "Paste the AGW1 setup line from your iPhone, then press Enter:\n",
+      );
+      try {
+        const iterator = lines[Symbol.asyncIterator]();
+        const line = await iterator.next();
+        if (line.done) throw new Error("pairing_setup_required");
+        await pairWithCode(bridge, parsePairingSetup(line.value));
+        result = {
+          status: "paired",
+          transportConfiguration: await bridge.transportConfiguration(),
+        };
+      } finally {
+        lines.close();
+      }
+      break;
+    }
     case "offer":
       result = await bridge.offer();
       break;

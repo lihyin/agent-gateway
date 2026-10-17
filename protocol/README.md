@@ -1,5 +1,12 @@
 # Protocol v1
 
+Endpoint identity pairing now defaults to the [AGW1 one-time-code protocol](../docs/pin-pairing.md).
+Library SRP-6a and authenticated JOSE records carry the existing signed
+offer/receipt exchange through `/v1/pairing/<session>/{device,agent}`. The manual
+full-fingerprint flow remains compatible. Payload envelopes and routing
+capabilities remain version 1; pairing cannot enroll arbitrary transport keys
+into the relay's operator configuration or bypass phone source authorization.
+
 Pairing and nested JOSE now support relay-only APNs delivery and encrypted return
 over a Muse-runtime outbound connection. See [transport API](../docs/api.md),
 [architecture](../docs/architecture.md) and [setup](../docs/remote-delivery.md).

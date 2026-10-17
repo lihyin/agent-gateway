@@ -1,5 +1,12 @@
 # Agent Gateway Development Plan
 
+**Pairing revision:** [One-time-code pairing](docs/pin-pairing.md) replaces manual
+offer/receipt copying as the default. A transient five-minute relay room forwards
+library SRP-6a and encrypted signed pairing material; phone confirmation remains
+required. Full-fingerprint pairing is the advanced fallback. No extra server or
+persistent mailbox is introduced. Operator transport pins and notification route
+setup remain separate deployment steps.
+
 **Architecture:** mobile-authoritative gateway and relay-only encrypted notification transport
 **Relay:** Cloudflare Worker / TypeScript / HTTPS
 **Mobile:** Flutter with native iOS/Android integration
@@ -162,7 +169,7 @@ Add mocked checks to Compose as integrations appear, then validate live provider
 
 ### Day 4 / PR04 â€” Pairing and routing capabilities
 
-**Build:** Generate device and agent identities through the chosen libraries. Implement a user-confirmed fingerprint/QR pairing flow that pins authenticated public keys. Define minimal pairing/capability-issuance endpoints, prove device key ownership, and require authenticated agent connection configuration. Issue expiring signed route capabilities without a device registry. Add local unpairing, pairing epochs, and capability replacement hooks; use mock push destinations until Day 7.
+**Build:** Generate device and agent identities through the chosen libraries. Implement a user-confirmed one-time-code flow using library PAKE, with a manual full-fingerprint fallback that pins authenticated public keys. Define minimal pairing/capability-issuance endpoints, prove device key ownership, and require authenticated agent connection configuration. Issue expiring signed route capabilities without a device registry. Add local unpairing, pairing epochs, and capability replacement hooks; use mock push destinations until Day 7.
 
 **Verify:** Reject mismatched fingerprints, substituted keys, unauthenticated agent connections, invalid capability signatures, wrong identities, and expired routes. Confirm unpairing denies local source access even while a transport capability remains valid.
 

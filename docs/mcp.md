@@ -4,7 +4,7 @@ The official-SDK MCP adapter runs over stdio inside the existing agent runtime.
 It opens no HTTP listener and requires no separately hosted bridge. A CLI client
 is also available; see [Muse setup](remote-delivery.md).
 
-Complete [fingerprint pairing](paired-delivery.md) and phone notification route
+Complete [one-time-code pairing](pin-pairing.md) and phone notification route
 registration first. Install dependencies and build `agent-adapter`. Start
 `node agent-adapter/dist/src/mcp-server.js` with:
 

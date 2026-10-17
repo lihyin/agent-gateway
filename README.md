@@ -15,7 +15,7 @@ coordination, without an application database or request/result mailbox. This is
 an explicit revision of the earlier strictly stateless/callback-only design.
 Endpoints retain durable request/replay/result state and retry within five minutes.
 
-Implemented: authenticated pairing, nested JOSE encryption, device-local Gmail
+Implemented: one-time-code pairing through the relay, nested JOSE encryption, device-local Gmail
 OAuth/review, APNs notification transport, native iOS ciphertext inbox, signed
 result return, outbound CLI and optional local stdio MCP. Real Muse account
 installation, live APNs and physical-device acceptance remain unverified. Android
@@ -23,6 +23,7 @@ push is not implemented. The deployed release does not automatically acquire
 these new changes until the tested revision is released and configured.
 
 - [Relay-only setup](docs/remote-delivery.md)
+- [Pair with Muse using a one-time code](docs/pin-pairing.md)
 - [Architecture](docs/architecture.md)
 - [API](docs/api.md)
 - [Security](docs/security.md)

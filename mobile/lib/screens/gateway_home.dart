@@ -26,6 +26,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
       _fingerprint = TextEditingController(),
       _envelope = TextEditingController();
   Timer? _expiry;
+  Completer<void>? _resumed;
   bool _sensitive = false, _obscured = false;
   @override
   void initState() {
@@ -45,9 +46,12 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
         state == AppLifecycleState.paused) {
       setState(() => _obscured = true);
       widget.controller.obscure();
+      _resumed ??= Completer<void>();
     } else if (state == AppLifecycleState.resumed) {
       setState(() => _obscured = false);
       widget.controller.foreground = true;
+      _resumed?.complete();
+      _resumed = null;
       if (widget.controller.ready) widget.controller.reload();
     }
   }
@@ -56,6 +60,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _expiry?.cancel();
+    _resumed?.complete();
     _query.dispose();
     _purpose.dispose();
     _offer.dispose();
@@ -140,6 +145,108 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
       ),
     );
     if (yes == true) await widget.controller.decide(entry, ReviewAction.always);
+  }
+
+  Future<bool> _confirmPairing() async {
+    final pairing = widget.controller.pinPairing;
+    if (pairing == null) return false;
+    if (_obscured) {
+      final remaining =
+          pairing.exchange.expiresAt * 1000 -
+          DateTime.now().millisecondsSinceEpoch;
+      if (remaining <= 0) return false;
+      try {
+        await (_resumed ??= Completer<void>()).future.timeout(
+          Duration(milliseconds: remaining),
+        );
+      } on TimeoutException {
+        return false;
+      }
+    }
+    if (!mounted ||
+        _obscured ||
+        widget.controller.pinPairing != pairing ||
+        pairing.status != 'confirming') {
+      return false;
+    }
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Allow this Muse client to pair?'),
+            content: const Text(
+              'The client proved it knows your one-time code. Continue only if you just gave the setup message to Muse. Gmail requests will still need your approval.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Deny'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Allow and authenticate'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Widget _pinPairing(GatewayController c) {
+    final pairing = c.pinPairing;
+    final active =
+        pairing != null && !['paired', 'failed'].contains(pairing.status);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FilledButton(
+          onPressed:
+              c.busy ||
+                  !c.ready ||
+                  c.relay == null ||
+                  active ||
+                  c.delivery?.agentId != null
+              ? null
+              : () => c.startPinPairing(_confirmPairing),
+          child: const Text('Pair with Muse'),
+        ),
+        if (pairing != null) ...[
+          if (pairing.status == 'waiting') ...[
+            const Text('One-time pairing code'),
+            SelectableText(
+              '${pairing.exchange.code.substring(0, 4)} ${pairing.exchange.code.substring(4)}',
+              style: Theme.of(context).textTheme.headlineLarge,
+            ),
+            const Text(
+              'Copy the setup message to your trusted Muse chat. Keep this app open. The code expires in five minutes and allows one attempt.',
+            ),
+            TextButton(
+              onPressed: () => Clipboard.setData(
+                ClipboardData(
+                  text:
+                      'Pair this Muse runtime with my Agent Gateway iPhone. Run the Agent Gateway CLI pair command and provide this setup line on standard input. Keep the code private.\n${pairing.exchange.setupLine}',
+                ),
+              ),
+              child: const Text('Copy setup message'),
+            ),
+          ],
+          Text(switch (pairing.status) {
+            'connecting' => 'Connecting to relay…',
+            'waiting' => 'Waiting for Muse…',
+            'authenticating' || 'offer' => 'Verifying the one-time code…',
+            'confirming' => 'Review the pairing confirmation.',
+            'finishing' => 'Phone paired. Waiting for Muse confirmation…',
+            'paired' => 'Muse and iPhone are paired.',
+            _ => _errorMessage(pairing.error ?? 'pairing_failed'),
+          }),
+          if (active)
+            TextButton(
+              onPressed: c.cancelPinPairing,
+              child: const Text('Cancel pairing'),
+            ),
+        ],
+      ],
+    );
   }
 
   Widget _entry(ReviewEntry entry, bool busy) {
@@ -319,31 +426,46 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                       const SizedBox(height: 24),
                       const Text('Authenticated agent pairing'),
                       if (c.delivery!.agentId == null) ...[
-                        TextField(
-                          controller: _offer,
-                          maxLength: 5000,
-                          decoration: const InputDecoration(
-                            labelText: 'Signed agent pairing offer',
-                          ),
-                        ),
-                        TextField(
-                          controller: _fingerprint,
-                          maxLength: 64,
-                          decoration: const InputDecoration(
-                            labelText:
-                                'Agent fingerprint from trusted terminal',
-                          ),
-                        ),
-                        const Text(
-                          'Compare the full fingerprint with your agent terminal through a trusted channel. Never trust a fingerprint supplied by an unknown request.',
-                        ),
-                        FilledButton(
-                          onPressed: c.busy || !c.ready
-                              ? null
-                              : () => c.pair(_offer.text, _fingerprint.text),
-                          child: const Text('Verify and pair agent'),
+                        _pinPairing(c),
+                        ExpansionTile(
+                          title: const Text('Advanced: manual pairing'),
+                          children: [
+                            TextField(
+                              controller: _offer,
+                              maxLength: 5000,
+                              decoration: const InputDecoration(
+                                labelText: 'Signed agent pairing offer',
+                              ),
+                            ),
+                            TextField(
+                              controller: _fingerprint,
+                              maxLength: 64,
+                              decoration: const InputDecoration(
+                                labelText:
+                                    'Agent fingerprint from trusted terminal',
+                              ),
+                            ),
+                            const Text(
+                              'Compare the full fingerprint with your agent terminal through a trusted channel. Never trust a fingerprint supplied by an unknown request.',
+                            ),
+                            FilledButton(
+                              onPressed:
+                                  c.busy ||
+                                      !c.ready ||
+                                      (c.pinPairing != null &&
+                                          ![
+                                            'paired',
+                                            'failed',
+                                          ].contains(c.pinPairing!.status))
+                                  ? null
+                                  : () =>
+                                        c.pair(_offer.text, _fingerprint.text),
+                              child: const Text('Verify and pair agent'),
+                            ),
+                          ],
                         ),
                       ] else ...[
+                        if (c.pinPairing != null) _pinPairing(c),
                         if (c.relay != null)
                           SwitchListTile(
                             title: const Text('Relay notifications'),
@@ -475,6 +597,13 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
       'Use a bounded query and purpose; this request may have expired.',
     'query_scope_denied' =>
       'Wildcards and query-supplied date overrides are not supported.',
+    'pairing_expired' =>
+      'The pairing code expired. Tap Pair with Muse for a new code.',
+    'pairing_failed' => 'The pairing attempt failed. Cancel and generate a fresh code on the iPhone.',
+    'pairing_cancelled' =>
+      'Pairing was declined. Generate a fresh code to try again.',
+    'pairing_interrupted' => 'The connection ended. Check whether Muse paired; otherwise unpair and try a fresh code.',
+    'pairing_unavailable' => 'Cannot reach pairing on the relay. Check connectivity and that the new relay version is deployed.',
     'invalid_pairing' => 'Pairing failed. Check the full fingerprint and use a fresh signed offer.',
     'invalid_envelope' =>
       'Encrypted transfer is invalid or exceeds its size limit.',

@@ -12,15 +12,19 @@ Muse connector installation or publication.
 
 Use Node 22+, install this repository's dependencies with `npm ci`, and build with
 `npm run build --workspace agent-adapter`. Set `GATEWAY_AGENT_STATE` to a private,
-backup-excluded path inside Muse's runtime. Generate a pairing offer:
+backup-excluded path inside Muse's runtime. On the iPhone tap **Pair with Muse**,
+copy its setup message to your trusted Muse conversation, then run:
 
 ```sh
-node agent-adapter/dist/src/cli.js offer
+node agent-adapter/dist/src/cli.js pair
 ```
 
-The operator compares fingerprints and transfers the signed offer/phone receipt
-as described in [pairing](paired-delivery.md). Run `accept` on the same Muse-side
-state file within five minutes. No source credentials enter that runtime.
+Provide the message's `AGW1.…` line on standard input. Approve the pairing on the
+phone and authenticate. The one-time code expires within five minutes, permits
+one attempt and is never sent to the relay. No fingerprint/receipt copying is
+needed. See [code pairing](pin-pairing.md), including interrupted-pair recovery.
+The [manual fallback](paired-delivery.md) remains available. No source credentials
+enter Muse's runtime. Pairing uses foreground sockets and does not send a push.
 
 With the client stopped, export the public transport pins:
 
@@ -33,8 +37,8 @@ upload the private agent state file to Cloudflare or share it in chat.
 
 ## 2. Configure the existing relay
 
-The Wrangler configuration binds `CHANNELS` to the internal `RequestChannel`
-Durable Object and includes its initial class migration for local/staging/production.
+The Wrangler configuration binds `CHANNELS` to `RequestChannel` and `PAIRINGS` to
+`PairingChannel`, with `v1-channels` and `v2-pairing` class migrations for all environments.
 It stores no request/result mailbox and uses no application database.
 
 Set these Worker secrets separately for each environment, using Wrangler or the

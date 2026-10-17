@@ -1,7 +1,11 @@
 # Pairing and foreground encrypted delivery
 
-Pairing pins one device and one agent with two-way fingerprint comparison and
-device authentication. Automatic relay-only APNs delivery is implemented; see
+The primary flow is [Pair with Muse using a one-time code](pin-pairing.md): tap,
+copy one setup message to Muse, then approve and authenticate on the phone.
+Offers and receipts transfer automatically over an SRP-authenticated channel.
+The instructions below are the **Advanced: manual pairing** fallback, which pins
+one device and one agent with two-way fingerprint comparison and device
+authentication. Automatic relay-only APNs delivery is implemented; see
 [setup](remote-delivery.md). The agent client runs inside Muse, without a hosted
 bridge or callback server. This page also documents manual encrypted transfer as
 a fallback. Real provider/device acceptance remains required.
@@ -26,7 +30,7 @@ process lock. Use OS disk encryption. State is agent-owned, never relay-owned.
 
 ## Pair the phone
 
-1. Paste only `offer` into **Signed agent pairing offer** on the iPhone.
+1. Expand **Advanced: manual pairing**. Paste only `offer` into **Signed agent pairing offer** on the iPhone.
 2. Enter the full `fingerprint` from the trusted agent terminal into **Agent
    fingerprint from trusted terminal**. Do not trust an unsolicited fingerprint.
 3. Tap **Verify and pair agent** and authenticate on the device.
@@ -99,8 +103,10 @@ agent-side jobs/pinned device keys.
 - At most 20 reservations/jobs are kept, for at most 24 hours after expiry. Phone
   outcome files contain ciphertext. The agent can retain approved plaintext after
   decrypting; the phone cannot revoke already disclosed data.
-- Only public pairing material/ciphertext enters clipboard transfer. Google
-  credentials and device private keys are never exported.
+- The advanced manual flow copies public pairing material/ciphertext. The code
+  flow's setup message also contains its short-lived secret PIN: send it only to
+  trusted Muse and keep it out of logs. Google credentials and device private
+  keys are never exported.
 - Remove a stale agent `.lock` file after a crash only after verifying no process
   uses that state. Do not share one state file across users. Disk loss requires
   re-pairing. Relay-only notification transport uses the same protected domain pipeline.

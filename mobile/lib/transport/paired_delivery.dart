@@ -83,85 +83,89 @@ class PairedDelivery {
     }
   }
 
-  Future<String> pair(String offer, String expectedFingerprint) => _serial.run(
-    () async {
-      _check();
-      if (_pair != null || offer.length > 5000) {
+  Future<String> pair(
+    String offer,
+    String expectedFingerprint, {
+    bool Function()? stillAuthorized,
+    String? confirmationReason,
+  }) => _serial.run(() async {
+    _check();
+    if (_pair != null || offer.length > 5000) {
+      throw const GatewayError('invalid_pairing');
+    }
+    try {
+      final parts = offer.split('.');
+      protectedHeader(offer, 3);
+      final candidate = Map<String, dynamic>.from(
+        jsonDecode(
+          utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+        ),
+      );
+      exactKeys(candidate, {
+        'version',
+        'kind',
+        'nonce',
+        'identity',
+        'issuedAt',
+        'expiresAt',
+      });
+      final public = Map<String, dynamic>.from(candidate['identity']);
+      validatePublicIdentity(public);
+      final verified = await verifyObject(
+        Map<String, dynamic>.from(public['signing']),
+        offer,
+        'agw+pairing',
+      );
+      final now = clock().millisecondsSinceEpoch ~/ 1000;
+      if (canonical(verified) != canonical(candidate) ||
+          candidate['version'] != 1 ||
+          candidate['kind'] != 'offer' ||
+          candidate['nonce'] is! String ||
+          !RegExp(r'^[0-9a-f-]{36}$').hasMatch(candidate['nonce']) ||
+          candidate['issuedAt'] is! int ||
+          candidate['expiresAt'] is! int ||
+          candidate['issuedAt'] > now ||
+          candidate['expiresAt'] <= now ||
+          candidate['expiresAt'] <= candidate['issuedAt'] ||
+          candidate['expiresAt'] - candidate['issuedAt'] > 300 ||
+          hash(public) != expectedFingerprint.trim().toLowerCase()) {
         throw const GatewayError('invalid_pairing');
       }
-      try {
-        final parts = offer.split('.');
-        protectedHeader(offer, 3);
-        final candidate = Map<String, dynamic>.from(
-          jsonDecode(
-            utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
-          ),
-        );
-        exactKeys(candidate, {
-          'version',
-          'kind',
-          'nonce',
-          'identity',
-          'issuedAt',
-          'expiresAt',
-        });
-        final public = Map<String, dynamic>.from(candidate['identity']);
-        validatePublicIdentity(public);
-        final verified = await verifyObject(
-          Map<String, dynamic>.from(public['signing']),
-          offer,
-          'agw+pairing',
-        );
-        final now = clock().millisecondsSinceEpoch ~/ 1000;
-        if (canonical(verified) != canonical(candidate) ||
-            candidate['version'] != 1 ||
-            candidate['kind'] != 'offer' ||
-            candidate['nonce'] is! String ||
-            !RegExp(r'^[0-9a-f-]{36}$').hasMatch(candidate['nonce']) ||
-            candidate['issuedAt'] is! int ||
-            candidate['expiresAt'] is! int ||
-            candidate['issuedAt'] > now ||
-            candidate['expiresAt'] <= now ||
-            candidate['expiresAt'] <= candidate['issuedAt'] ||
-            candidate['expiresAt'] - candidate['issuedAt'] > 300 ||
-            hash(public) != expectedFingerprint.trim().toLowerCase()) {
-          throw const GatewayError('invalid_pairing');
-        }
-        if (!await confirmation.confirm(
-          'Pair with agent fingerprint ${hash(public)}',
-        )) {
-          throw const GatewayError('local_confirmation_required');
-        }
-        if (candidate['expiresAt'] <= clock().millisecondsSinceEpoch ~/ 1000) {
-          throw const GatewayError('invalid_pairing');
-        }
-        final epoch = uuid();
-        final receipt = signObject(_identity!, {
-          'version': 1,
-          'kind': 'accept',
-          'nonce': candidate['nonce'],
-          'offerDigest': hash(offer),
-          'agentId': identityId(public),
-          'identity': publicIdentity(_identity!),
-          'epoch': epoch,
-          'issuedAt': clock().millisecondsSinceEpoch ~/ 1000,
-          'expiresAt': candidate['expiresAt'],
-        }, 'agw+pairing');
-        final pair = {
-          'agentId': identityId(public),
-          'identity': public,
-          'epoch': epoch,
-        };
-        await _save('transport.pair', pair);
-        _pair = pair;
-        return receipt;
-      } on GatewayError {
-        rethrow;
-      } catch (_) {
+      if (!await confirmation.confirm(
+        confirmationReason ?? 'Pair with agent fingerprint ${hash(public)}',
+      )) {
+        throw const GatewayError('local_confirmation_required');
+      }
+      if (candidate['expiresAt'] <= clock().millisecondsSinceEpoch ~/ 1000 ||
+          (stillAuthorized != null && !stillAuthorized())) {
         throw const GatewayError('invalid_pairing');
       }
-    },
-  );
+      final epoch = uuid();
+      final receipt = signObject(_identity!, {
+        'version': 1,
+        'kind': 'accept',
+        'nonce': candidate['nonce'],
+        'offerDigest': hash(offer),
+        'agentId': identityId(public),
+        'identity': publicIdentity(_identity!),
+        'epoch': epoch,
+        'issuedAt': clock().millisecondsSinceEpoch ~/ 1000,
+        'expiresAt': candidate['expiresAt'],
+      }, 'agw+pairing');
+      final pair = {
+        'agentId': identityId(public),
+        'identity': public,
+        'epoch': epoch,
+      };
+      await _save('transport.pair', pair);
+      _pair = pair;
+      return receipt;
+    } on GatewayError {
+      rethrow;
+    } catch (_) {
+      throw const GatewayError('invalid_pairing');
+    }
+  });
   Future<void> unpair() => _serial.run(() async {
     _check();
     _pair = null; // Local revocation precedes storage I/O, including failure.
