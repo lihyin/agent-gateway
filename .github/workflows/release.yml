@@ -57,8 +57,9 @@ jobs:
           EXPECTED_REVISION: ${{ github.sha }}
           EXPECTED_ENVIRONMENT: staging
         run: |
-          npx wrangler deploy --config relay/wrangler.toml --env staging --var RELEASE_SHA:${GITHUB_SHA}
+          npx wrangler deploy --config relay/wrangler.toml --env staging --var RELEASE_SHA:${GITHUB_SHA} --var "RELAY_ORIGIN:$RELAY_URL"
           node scripts/verify-health.mjs
+          node scripts/verify-pairing.mjs
       - name: Deploy production and verify release
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -68,8 +69,9 @@ jobs:
           EXPECTED_REVISION: ${{ github.sha }}
           EXPECTED_ENVIRONMENT: production
         run: |
-          npx wrangler deploy --config relay/wrangler.toml --env production --var RELEASE_SHA:${GITHUB_SHA}
+          npx wrangler deploy --config relay/wrangler.toml --env production --var RELEASE_SHA:${GITHUB_SHA} --var "RELAY_ORIGIN:$RELAY_URL"
           node scripts/verify-health.mjs
+          node scripts/verify-pairing.mjs
       - name: Build, sign, and publish iOS through Codemagic
         env:
           STAGING_RELAY_URL: ${{ vars.STAGING_RELAY_URL }}

@@ -9,6 +9,9 @@ the internal live-channel migrations, and Muse-runtime client installation.
 The [one-time-code pairing flow](pin-pairing.md) additionally needs the `PAIRINGS`
 binding and `v2-pairing` migration plus matching phone/client versions. Codemagic
 installs Node dependencies before Flutter tests for Dart/Node interoperability.
+Release and relay recovery deployments set the public `RELAY_ORIGIN` directly
+from the selected environment's relay URL. Release verifies a disposable live
+pairing channel after health checks, before starting the signed iPhone build.
 Day 1 health-only evidence below is historical and does not establish new push acceptance.
 
 ## 1. Git identity and repository

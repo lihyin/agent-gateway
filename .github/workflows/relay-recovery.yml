@@ -76,7 +76,7 @@ jobs:
         run: |
           test "$EXPECTED_REVISION" = "$(git rev-parse HEAD)"
           npm run check
-          npx wrangler deploy --config relay/wrangler.toml --env "$TARGET_ENVIRONMENT" --var "RELEASE_SHA:$EXPECTED_REVISION"
+          npx wrangler deploy --config relay/wrangler.toml --env "$TARGET_ENVIRONMENT" --var "RELEASE_SHA:$EXPECTED_REVISION" --var "RELAY_ORIGIN:$RELAY_URL"
       - name: Activate selected version
         if: inputs.operation == 'rollback'
         run: |
@@ -85,6 +85,7 @@ jobs:
         if: inputs.operation != 'list'
         run: |
           node scripts/verify-health.mjs
+          if [ "${{ inputs.operation }}" = deploy ]; then node scripts/verify-pairing.mjs; fi
           npx wrangler deployments list --config relay/wrangler.toml --env "$TARGET_ENVIRONMENT" --json > relay-deployments-after.json
       - uses: actions/upload-artifact@v4
         if: always()
