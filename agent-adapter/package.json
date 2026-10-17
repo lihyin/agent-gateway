@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx src/server.ts",
     "mcp": "tsx src/mcp-server.ts",
+    "remote": "tsx src/remote-server.ts",
     "agent": "tsx src/cli.ts",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",

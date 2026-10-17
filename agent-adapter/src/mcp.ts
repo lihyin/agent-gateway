@@ -33,21 +33,23 @@ async function response(task: () => Promise<unknown>) {
     };
   }
 }
-export function createMcpServer(bridge: Bridge): McpServer {
+export function createMcpServer(bridge: Bridge, automatic = false): McpServer {
   const server = new McpServer(
     { name: "agent-gateway", version: "1.0.0" },
     {
       maxToolInputElements: 64,
-      instructions:
-        "Device-owned Gmail approval. Requests require foreground encrypted transfer to the paired iPhone and explicit device consent. Pending review is not a completed search. Only verified device-approved results are returned. Pairing is operator-managed; no source credentials are accepted.",
+      instructions: automatic
+        ? "Gmail requests await approval in the paired iPhone app. Keep the app open for automatic encrypted relay transfer. Poll gateway_request_status for pending review; pending is never a successful search. Only phone-approved data is returned. Never request credentials or approval overrides."
+        : "Device-owned Gmail approval. Requests require foreground encrypted transfer to the paired iPhone and explicit device consent. Pending review is not a completed search. Only verified device-approved results are returned. Pairing is operator-managed; no source credentials are accepted.",
     },
   );
   server.registerTool(
     "gmail_request_preview",
     {
       title: "Request approved Gmail preview",
-      description:
-        "Create a bounded encrypted Gmail search request for the paired iPhone. This stores a pending job; it does not fetch Gmail or approve disclosure. Transfer the returned envelope to the phone. Reuse requestId and identical arguments on retry. Results expire after five minutes.",
+      description: automatic
+        ? "Request a bounded Gmail search through the paired iPhone. Returns a pending request ID; keep the phone app open and obtain phone consent. Poll gateway_request_status until approved, denied, or expired. Reuse the same requestId and arguments on retry. Expires after five minutes."
+        : "Create a bounded encrypted Gmail search request for the paired iPhone. This stores a pending job; it does not fetch Gmail or approve disclosure. Transfer the returned envelope to the phone. Reuse requestId and identical arguments on retry. Results expire after five minutes.",
       inputSchema: z
         .object({
           requestId: z.string().uuid(),
@@ -70,12 +72,15 @@ export function createMcpServer(bridge: Bridge): McpServer {
       },
     },
     async ({ requestId, ...arguments_ }) =>
-      response(() =>
-        bridge.request(
+      response(async () => {
+        const result = await bridge.request(
           { source: "gmail", operation: "search", ...arguments_ },
           requestId,
-        ),
-      ),
+        );
+        return automatic
+          ? { requestId: result.requestId, status: result.status }
+          : result;
+      }),
   );
   server.registerTool(
     "gateway_request_status",
@@ -91,8 +96,15 @@ export function createMcpServer(bridge: Bridge): McpServer {
         openWorldHint: false,
       },
     },
-    async ({ requestId }) => response(() => bridge.status(requestId)),
+    async ({ requestId }) =>
+      response(async () => {
+        const result = await bridge.status(requestId);
+        if (automatic && result.status === "pending_device_review")
+          return { status: result.status, requestId };
+        return result;
+      }),
   );
+  if (automatic) return server;
   server.registerTool(
     "gateway_submit_encrypted_result",
     {

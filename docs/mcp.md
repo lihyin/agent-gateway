@@ -3,7 +3,7 @@
 Implemented using the official TypeScript MCP SDK over local stdio. All tools use
 the paired bridge and the phone's encrypted consent/review pipeline. The server
 does not fetch Gmail directly, accept Google credentials, or run on the relay.
-Remote HTTP hosting, account linking and personal-Muse publication remain incomplete.
+Remote HTTP hosting is available in the optional [remote mode](remote-delivery.md). Account linking and personal-Muse publication remain incomplete.
 
 ## Connect
 
@@ -72,7 +72,7 @@ idempotent, conflicting outcomes fail, and retries do not extend expiry.
    After five minutes expect expired without messages. Forged/plaintext results,
    unrequested fields and unrelated IDs must fail.
 
-Transfer remains manual and foreground-only. Unattended personal-Muse use needs
+The stdio flow above uses manual foreground transfer. Unattended personal-Muse use needs
 a hosted authenticated bridge and automatic transport. The relay's health URL is
 not an MCP endpoint. No Meta Muse account integration is claimed.
 
@@ -95,3 +95,5 @@ connection are not established by mocked tests.
 
 References: [official MCP SDK server guidance](https://ts.sdk.modelcontextprotocol.io/server)
 and [Muse compatibility](meta-muse.md).
+
+Remote Streamable HTTP hosting and foreground transport are now implemented as an optional single-operator mode. See [remote setup](remote-delivery.md); the manual stdio instructions above remain available. Account linking and Muse publication still require separate integration.

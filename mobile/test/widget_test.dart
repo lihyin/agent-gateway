@@ -38,10 +38,7 @@ void main() {
       );
       expect(find.text('Agent Gateway'), findsOneWidget);
       expect(find.text('Release: tested-revision'), findsOneWidget);
-      expect(
-        find.textContaining('Automatic push delivery is not available.'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Enable relay delivery'), findsOneWidget);
       await tester.pumpAndSettle();
       expect(
         tester

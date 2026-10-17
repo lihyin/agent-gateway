@@ -10,6 +10,7 @@ import '../domain/gateway_configuration.dart';
 import '../domain/gateway_error.dart';
 import '../domain/gmail_request.dart';
 import '../transport/paired_delivery.dart';
+import '../transport/foreground_relay.dart';
 import '../vault/vault.dart';
 
 class GatewayController extends ChangeNotifier {
@@ -18,6 +19,7 @@ class GatewayController extends ChangeNotifier {
     required this.review,
     required this.gmailConfigured,
     this.delivery,
+    this.relay,
   });
   factory GatewayController.device(GatewayConfiguration configuration) {
     final vault = DeviceVault();
@@ -39,12 +41,19 @@ class GatewayController extends ChangeNotifier {
       review: review,
       gmailConfigured: oauth.isValid,
       delivery: delivery,
+      relay: configuration.relayUrl.isEmpty
+          ? null
+          : ForegroundRelay(configuration.relayUrl),
     );
   }
   final GmailSession session;
   final ReviewService review;
   final bool gmailConfigured;
   final PairedDelivery? delivery;
+  final ForegroundRelay? relay;
+  bool foreground = true;
+  bool get relayEnabled =>
+      relay != null && (delivery?.relayEnabled(relay!.origin) ?? false);
   String? exported;
   bool connected = false, busy = false, ready = false;
   String? error;
@@ -91,7 +100,24 @@ class GatewayController extends ChangeNotifier {
     rules = await review.rules();
   }
 
-  Future<void> reload() => _run(_reload);
+  Future<void> _sync() async {
+    if (foreground && connected && relayEnabled) {
+      await relay!.sync(delivery!, review);
+      await _reload();
+    }
+  }
+
+  Future<void> reload() => _run(() async {
+    await _reload();
+    await _sync();
+  });
+  Future<void> enableRelay(bool enabled) => _run(() async {
+    if (relay == null || delivery == null) {
+      throw const GatewayError('relay_configuration_required');
+    }
+    await delivery!.enableRelay(relay!.origin, enabled);
+    await _sync();
+  });
   Future<void> connect() => _run(() async {
     await review.cancelAll();
     await session.connect();
@@ -147,6 +173,7 @@ class GatewayController extends ChangeNotifier {
       await review.denyAccess(entry.request.id, entry.revision);
     }
     await _reload();
+    await _sync();
   });
   Future<void> decide(
     ReviewEntry entry,
@@ -161,12 +188,14 @@ class GatewayController extends ChangeNotifier {
       edited: edited,
     );
     await _reload();
+    await _sync();
   });
   Future<void> revoke(String scope) => _run(() async {
     await review.revokeRule(scope);
     await _reload();
   });
   void obscure() {
+    foreground = false;
     entries = [];
     exported = null;
     _notify();
@@ -200,5 +229,6 @@ class GatewayController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     super.dispose();
+    relay?.close();
   }
 }

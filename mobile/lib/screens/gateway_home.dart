@@ -47,6 +47,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
       widget.controller.obscure();
     } else if (state == AppLifecycleState.resumed) {
       setState(() => _obscured = false);
+      widget.controller.foreground = true;
       if (widget.controller.ready) widget.controller.reload();
     }
   }
@@ -270,7 +271,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'Connect Gmail to review a bounded preview. Pair an agent for foreground encrypted request/result transfer. Automatic push delivery is not available.',
+                      'Connect Gmail to review a bounded preview. Pair an agent for encrypted transfer. Enable relay delivery to receive requests and send approved results while this app is open.',
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -343,6 +344,17 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                           child: const Text('Verify and pair agent'),
                         ),
                       ] else ...[
+                        if (c.relay != null)
+                          SwitchListTile(
+                            title: const Text(
+                              'Relay delivery while app is open',
+                            ),
+                            subtitle: const Text(
+                              'Approved results are sent automatically to the paired agent. Keep this app open; background push is not available.',
+                            ),
+                            value: c.relayEnabled,
+                            onChanged: c.busy ? null : c.enableRelay,
+                          ),
                         Text(
                           'Agent fingerprint: ${c.delivery!.agentFingerprint}',
                         ),
@@ -461,6 +473,9 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
     'invalid_pairing' => 'Pairing failed. Check the full fingerprint and use a fresh signed offer.',
     'invalid_envelope' =>
       'Encrypted transfer is invalid or exceeds its size limit.',
+    'relay_unavailable' => 'Relay delivery is unavailable. Keep the app open to retry before the request expires.',
+    'relay_configuration_required' =>
+      'Relay delivery needs a configured HTTPS relay in this build.',
     'unpaired' => 'The request does not match the current paired agent.',
     'replay_changed_content' =>
       'This request identity was already used or its content changed.',

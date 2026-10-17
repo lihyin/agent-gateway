@@ -23,6 +23,7 @@ class PairedDelivery {
   final Future<Map<String, dynamic>> Function() keyGenerator;
   final _serial = SerialExecutor();
   Map<String, dynamic>? _identity, _pair;
+  Map<String, dynamic>? _relay;
   Map<String, dynamic> _replay = {};
   bool _ready = false;
   String? epoch(String id) =>
@@ -32,6 +33,11 @@ class PairedDelivery {
       _ready && _pair != null ? hash(_pair!['identity']) : null;
   String? get deviceFingerprint =>
       _ready ? hash(publicIdentity(_identity!)) : null;
+  bool relayEnabled(String origin) =>
+      _ready &&
+      _pair != null &&
+      _relay?['epoch'] == _pair?['epoch'] &&
+      _relay?['origin'] == origin;
   Future<void> initialize() => _serial.run(() async {
     _ready = false;
     _identity = await vault.read('transport.identity');
@@ -49,6 +55,7 @@ class PairedDelivery {
       }
     }
     _replay = await vault.read('transport.replay') ?? {};
+    _relay = await vault.read('transport.relay');
     final expired = _replay.keys
         .where(
           (id) =>
@@ -158,12 +165,52 @@ class PairedDelivery {
   Future<void> unpair() => _serial.run(() async {
     _check();
     _pair = null; // Local revocation precedes storage I/O, including failure.
+    _relay = null;
     try {
+      await vault.delete('transport.relay');
       await vault.delete('transport.pair');
     } catch (_) {
       _ready = false;
       rethrow;
     }
+  });
+  Future<void> enableRelay(String origin, bool enabled) =>
+      _serial.run(() async {
+        _check();
+        if (!enabled) {
+          _relay = null;
+          await vault.delete('transport.relay');
+          return;
+        }
+        if (_pair == null) throw const GatewayError('unpaired');
+        if (!await confirmation.confirm(
+          'Enable encrypted relay delivery to the paired agent? Approved results will be sent automatically while this app is open.',
+        )) {
+          throw const GatewayError('local_confirmation_required');
+        }
+        final value = {'epoch': _pair!['epoch'], 'origin': origin};
+        await _save('transport.relay', value);
+        _relay = value;
+      });
+  Future<String> syncProof(
+    String origin,
+    List<String> knownRequests,
+    Map<String, dynamic>? result,
+  ) => _serial.run(() async {
+    _check();
+    if (!relayEnabled(origin)) throw const GatewayError('unpaired');
+    final now = clock().millisecondsSinceEpoch ~/ 1000;
+    return signObject(_identity!, {
+      'version': 1,
+      'audience': origin,
+      'deviceId': identityId(_identity!),
+      'agentId': _pair!['agentId'],
+      'pairingEpoch': _pair!['epoch'],
+      'issuedAt': now,
+      'expiresAt': now + 30,
+      'knownRequests': knownRequests,
+      'result': result,
+    }, 'agw+sync');
   });
   Future<void> importRequest(String encoded, ReviewService review) =>
       _serial.run(() async {

@@ -1,4 +1,4 @@
-﻿# Security boundaries
+# Security boundaries
 
 ## Trust model
 
@@ -61,7 +61,7 @@ acceptance or automatic transport.
 
 Test cross-agent/device access, key substitution, context tampering, reflection, replay after restart, revoked pairing, expired approvals, Edit/Always escalation, connector bounds, PII/credential leakage, OAuth redirects/state, callback SSRF, and push/log content. Add cross-runtime crypto fixtures and physical iOS/Android checks for locked/killed apps, secure storage, push delays/duplicates, and biometrics.
 
-The relay still exposes health only and rejects unfinished routes; the demo
+The relay defaults to health only and enables foreground sync only with explicit operator configuration; the demo
 adapter does not accept callbacks. Mobile supports configured iOS Gmail OAuth,
 local previews and paired foreground requests. Native AppAuth owns PKCE/state
 and redirect validation; Google credentials and pending reviews live in
@@ -71,7 +71,7 @@ filtered. Allow/Deny/Edit/Always bind candidate revision/digest and current epoc
 State-write failure fails closed; replay survives restart and interrupted fetches
 do not repeat. Exact-scope rules expire after 24 hours and cannot bypass source
 consent or high-risk confirmation. Explicit encrypted export delivers approved
-results to the pinned agent. Automatic push/relay handoff remains incomplete.
+results to the pinned agent. Automatic push remains incomplete; optional foreground relay handoff is described below.
 See [Gmail setup](gmail-setup.md) for scope, retention, provider configuration,
 filtering coverage, and outstanding physical-device acceptance.
 
@@ -79,3 +79,9 @@ Release Gradle configuration requires actual signing credentials with no
 debug-key fallback. CI has read-only repository permissions; production secrets
 belong only to trusted release jobs and provider settings. The complete agent
 private-data security pipeline is not yet implemented or independently audited.
+
+## Optional foreground relay and remote MCP
+
+The configured sync route verifies ES256 device proofs bound to the pinned device, agent, epoch and relay audience, expiring within 30 seconds. The bridge independently verifies proofs and encrypted results. Proof retries are permitted within that interval; durable request/result deduplication preserves original expiry. The relay stores no mailbox. A fixed HTTPS bridge origin, no redirects, bounded bodies and timeouts constrain forwarding. Network and malformed upstream failures return sanitized transport errors.
+
+Remote MCP requires a distinct bearer token from relay transport, exact Host and Origin checks, POST-only bounded JSON, and a TLS reverse proxy. Remote tools expose job creation and status, never pairing or encrypted result submission. The bridge owns private agent keys and approved plaintext; deploy it under the operator's account, outside the relay. Mobile opt-in requires local confirmation and is bound to the current pairing epoch and relay origin. Foreground polling imports requests without authorizing source access and sends only locally approved encrypted outcomes. No OAuth account linking, background push, production hosting, or physical-device validation is claimed. See [setup](remote-delivery.md).

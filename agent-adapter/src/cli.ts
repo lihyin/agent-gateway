@@ -30,6 +30,9 @@ try {
     case "status":
       result = await bridge.status(input);
       break;
+    case "transport-config":
+      result = await bridge.transportConfiguration();
+      break;
     case "unpair":
       await bridge.unpair();
       result = { status: "unpaired" };

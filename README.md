@@ -1,10 +1,10 @@
-﻿# Agent Gateway
+# Agent Gateway
 
 Agent Gateway lets third-party agents such as Meta Muse request controlled access to private data. A stateless Cloudflare Worker transports end-to-end encrypted requests and results. A Flutter mobile app owns credentials, connectors, policy enforcement, minimization, PII filtering, and approval.
 
 The relay has no Gmail tokens, plaintext private data, or payload decryption keys.
 
-The relay remains health-only. The mobile app includes iOS Gmail sign-in, bounded review with access consent, filtering, and Allow/Deny/Edit/Always, plus authenticated pairing and foreground encrypted request/result transfer to one agent bridge. Automatic push/relay forwarding is not implemented. Live sign-in requires your public Google iOS OAuth client configuration and physical-device validation. See [paired delivery](docs/paired-delivery.md), [Gmail setup](docs/gmail-setup.md), and [milestone status](docs/milestones.md).
+The relay defaults to health-only; optional authenticated foreground forwarding and a remote MCP bridge are implemented (see [remote setup](docs/remote-delivery.md)). The mobile app includes iOS Gmail sign-in, bounded review with access consent, filtering, and Allow/Deny/Edit/Always, plus authenticated pairing and foreground encrypted request/result transfer to one agent bridge. Background push is not implemented; foreground relay delivery requires operator configuration and device opt-in. Live sign-in requires your public Google iOS OAuth client configuration and physical-device validation. See [paired delivery](docs/paired-delivery.md), [Gmail setup](docs/gmail-setup.md), and [milestone status](docs/milestones.md).
 
 The plan establishes production delivery on Day 1: Cloudflare relay, GitHub Actions CI/CD orchestration, Codemagic Android/iOS builds/signing/distribution, and Docker Compose for local development.
 

@@ -3,7 +3,7 @@
 Implemented: one device/agent pairing with two-way fingerprint comparison,
 device authentication, pinned public keys, and manual encrypted request/result
 transfer through the existing Gmail consent/review pipeline. Not implemented:
-APNs, routing capabilities, relay forwarding, or background delivery.
+APNs, routing capabilities, or background delivery. Optional foreground relay forwarding is described in [remote setup](remote-delivery.md).
 
 ## Agent setup
 
@@ -105,3 +105,5 @@ Cross-runtime fixtures verify real receipts and encrypted results with public,
 disposable test-only keys. Physical-device acceptance is still required: check
 fingerprint comparison/cancellation, Keychain persistence, locked-device behavior,
 and approval/export in TestFlight. Mock tests do not establish these checks.
+
+Optional authenticated foreground relay transfer is now implemented; see [remote setup](remote-delivery.md). APNs and background delivery remain unimplemented. The manual transfer flow above remains supported.

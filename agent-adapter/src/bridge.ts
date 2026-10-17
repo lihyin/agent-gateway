@@ -15,6 +15,21 @@ import {
   type Identity,
 } from "./crypto.js";
 import { validateProtocol } from "./protocol.js";
+import { z } from "zod";
+
+const syncSchema = z
+  .object({
+    version: z.literal(1),
+    audience: z.string(),
+    deviceId: z.string(),
+    agentId: z.string(),
+    pairingEpoch: z.string().uuid(),
+    issuedAt: z.number().int().nonnegative(),
+    expiresAt: z.number().int().nonnegative(),
+    knownRequests: z.array(z.string().uuid()).max(20),
+    result: z.unknown(),
+  })
+  .strict();
 
 export type Job = {
   envelope: Envelope;
@@ -227,46 +242,99 @@ export class Bridge {
     });
   }
   submit(envelope: Envelope): Promise<Record<string, unknown>> {
-    return this.run(async () => {
-      const pair = this.state.pairing,
-        job = this.state.jobs[envelope.context?.requestId];
-      if (!pair || !job) throw new Error("unknown_request");
-      const c = job.envelope.context;
-      const expected: Context = {
-        ...c,
-        direction: "result",
-        sender: c.recipient,
-        recipient: c.sender,
-      };
-      const result = await decrypt(
-        this.state.identity,
-        pair.identity,
-        envelope,
-        expected,
-        this.clock(),
-      );
-      const messages = result.messages as Record<string, unknown>[];
-      const scope = job.scope;
-      if (!scope || messages.length > (scope.maxResults as number))
+    return this.run(() => this.receive(envelope));
+  }
+  private async receive(envelope: Envelope): Promise<Record<string, unknown>> {
+    const pair = this.state.pairing,
+      job = this.state.jobs[envelope.context?.requestId];
+    if (!pair || !job) throw new Error("unknown_request");
+    const c = job.envelope.context;
+    const expected: Context = {
+      ...c,
+      direction: "result",
+      sender: c.recipient,
+      recipient: c.sender,
+    };
+    const result = await decrypt(
+      this.state.identity,
+      pair.identity,
+      envelope,
+      expected,
+      this.clock(),
+    );
+    const messages = result.messages as Record<string, unknown>[];
+    const scope = job.scope;
+    if (!scope || messages.length > (scope.maxResults as number))
+      throw new Error("invalid_result");
+    for (const message of messages) {
+      if (
+        Object.keys(message).some(
+          (k) => !(scope.fields as string[]).includes(k),
+        ) ||
+        (message.date !== undefined &&
+          ((message.date as number) < (scope.since as number) ||
+            (message.date as number) >= (scope.until as number)))
+      )
         throw new Error("invalid_result");
-      for (const message of messages) {
-        if (
-          Object.keys(message).some(
-            (k) => !(scope.fields as string[]).includes(k),
-          ) ||
-          (message.date !== undefined &&
-            ((message.date as number) < (scope.since as number) ||
-              (message.date as number) >= (scope.until as number)))
-        )
-          throw new Error("invalid_result");
+    }
+    const digest = canonical(envelope);
+    if (job.resultDigest && job.resultDigest !== digest)
+      throw new Error("replay");
+    job.result = result;
+    job.resultDigest = digest;
+    await this.persist();
+    return result;
+  }
+  sync(
+    compact: string,
+    audience: string,
+  ): Promise<{ acknowledged: string | null; envelope: Envelope | null }> {
+    return this.run(async () => {
+      const pair = this.state.pairing;
+      if (!pair || Buffer.byteLength(compact) > 92000)
+        throw new Error("unpaired");
+      const proof = syncSchema.parse(
+        await verifyObject(pair.identity.signing, compact, "agw+sync"),
+      );
+      const now = this.clock();
+      if (
+        proof.audience !== audience ||
+        proof.deviceId !== (await identityId(pair.identity)) ||
+        proof.agentId !== (await identityId(this.state.identity)) ||
+        proof.pairingEpoch !== pair.epoch ||
+        proof.issuedAt > now ||
+        proof.expiresAt <= now ||
+        proof.expiresAt <= proof.issuedAt ||
+        proof.expiresAt - proof.issuedAt > 30 ||
+        !("result" in proof)
+      )
+        throw new Error("invalid_request");
+      let acknowledged: string | null = null;
+      if (proof.result !== null) {
+        // No plaintext crosses the relay, including in this acknowledgment.
+        const envelope = proof.result as Envelope;
+        await this.receive(envelope);
+        acknowledged = envelope.context.requestId;
       }
-      const digest = canonical(envelope);
-      if (job.resultDigest && job.resultDigest !== digest)
-        throw new Error("replay");
-      job.result = result;
-      job.resultDigest = digest;
-      await this.persist();
-      return result;
+      const next = Object.values(this.state.jobs).find(
+        (job) =>
+          !job.result &&
+          job.envelope.context.expiresAt > now &&
+          !proof.knownRequests.includes(job.envelope.context.requestId),
+      );
+      return { acknowledged, envelope: next?.envelope ?? null };
+    });
+  }
+  transportConfiguration(): Promise<Record<string, unknown>> {
+    return this.run(async () => {
+      const pair = this.state.pairing;
+      if (!pair) throw new Error("unpaired");
+      return {
+        deviceSigningKey: publicIdentity(pair.identity).signing,
+        deviceId: await identityId(pair.identity),
+        agentId: await identityId(this.state.identity),
+        pairingEpoch: pair.epoch,
+      };
     });
   }
   status(id: string): Promise<Record<string, unknown>> {
