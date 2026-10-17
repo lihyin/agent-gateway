@@ -19,7 +19,7 @@ import UserNotifications
   }
   private func saveInbox(_ values: [String]) throws {
     try FileManager.default.createDirectory(at: inboxURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-    try JSONEncoder().encode(values).write(to: inboxURL, options: [.atomic, .completeUntilFirstUserAuthentication])
+    try JSONEncoder().encode(values).write(to: inboxURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     var url = inboxURL
     var resourceValues = URLResourceValues()
     resourceValues.isExcludedFromBackup = true
