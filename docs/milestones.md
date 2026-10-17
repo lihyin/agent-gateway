@@ -6,16 +6,16 @@ An official-SDK stdio MCP server exposes bounded preview requests, status and
 verified encrypted-result submission through the same agent bridge. Pairing is
 operator-managed. SDK client tests cover discovery, idempotence, expiry,
 scope/forgery rejection and a real subprocess. See [MCP setup](mcp.md).
-Remote hosting and a real Muse account connection remain unimplemented/unverified.
+Authenticated remote MCP hosting and opt-in foreground relay sync are implemented; see [remote setup](remote-delivery.md) and [acceptance evidence](foreground-acceptance.md). A real Muse account connection remains unverified.
 
 Pairing and encrypted manual foreground delivery are implemented; see
 [paired delivery](paired-delivery.md). Protected device keys, pinned agent epochs,
 durable request reservations and approval-bound encrypted result export have
-cross-runtime and negative security tests. Automatic push/relay forwarding and
+cross-runtime and negative security tests. Background push and
 physical-device acceptance remain incomplete.
 
 Official connector guidance supports API/MCP integrations, but the current
-gateway has no authenticated remote-agent delivery pipeline. The compatibility
+gateway has an authenticated foreground remote-agent delivery pipeline awaiting hosted/device acceptance. The compatibility
 decision and remaining prerequisites are recorded in [Meta Muse](meta-muse.md).
 No live connector, submission, or end-to-end Muse validation is claimed.
 
