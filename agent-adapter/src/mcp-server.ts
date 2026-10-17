@@ -2,17 +2,41 @@ import { Readable } from "node:stream";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createMcpServer } from "./mcp.js";
 import { openBridge } from "./store.js";
+import { relayRequest } from "./relay-client.js";
 
 async function main() {
   const path = process.env.GATEWAY_AGENT_STATE;
   if (!path) throw new Error("configuration_required");
   const { bridge, close } = await openBridge(path);
-  const server = createMcpServer(bridge);
+  const origin = process.env.RELAY_URL,
+    route = process.env.RELAY_ROUTE;
+  if (Boolean(origin) !== Boolean(route)) {
+    await close();
+    throw new Error("configuration_required");
+  }
+  const controller = new AbortController();
+  const active = new Map<string, Promise<unknown>>();
+  const server = createMcpServer(bridge, Boolean(origin), (id) => {
+    if (!origin || !route || active.has(id)) return;
+    const task = relayRequest(bridge, id, origin, route, controller.signal)
+      .catch(() => {
+        if (!controller.signal.aborted)
+          process.stderr.write(
+            "Relay delivery incomplete; check configuration and retry the same request before expiry.\n",
+          );
+      })
+      .finally(() => {
+        active.delete(id);
+      });
+    active.set(id, task);
+  });
   let closed = false;
   const shutdown = async () => {
     if (closed) return;
     closed = true;
+    controller.abort();
     await server.close();
+    await Promise.allSettled(active.values());
     await close();
   };
   async function* boundedInput() {

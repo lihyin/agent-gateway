@@ -116,6 +116,11 @@ class GatewayController extends ChangeNotifier {
       throw const GatewayError('relay_configuration_required');
     }
     await delivery!.enableRelay(relay!.origin, enabled);
+    if (enabled) {
+      exported = await relay!.register(delivery!);
+    } else {
+      exported = null;
+    }
     await _sync();
   });
   Future<void> connect() => _run(() async {
@@ -123,6 +128,10 @@ class GatewayController extends ChangeNotifier {
     await session.connect();
     connected = true;
     await _reload();
+  });
+  Future<void> refreshRelayRoute() => _run(() async {
+    if (!relayEnabled) throw const GatewayError('relay_configuration_required');
+    exported = await relay!.register(delivery!);
   });
   Future<void> disconnect() => _run(() async {
     connected = false;

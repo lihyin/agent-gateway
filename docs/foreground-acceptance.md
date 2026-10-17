@@ -1,66 +1,55 @@
-# Foreground delivery acceptance record
+# Relay-only acceptance
 
-Release candidate: `6af1f5e7678f205ad1db1e2e1df74c4ced6993de`.
+The implementation has changed from separate hosted-bridge polling to direct
+Muse-runtime outbound WebSocket transport through the Cloudflare relay and APNs.
+Earlier deployments such as `6af1f5e` do not prove this new implementation is live.
+The latest prior signed release failed TestFlight post-processing; distribution
+must be retried only after provider errors and push-signing prerequisites are fixed.
 
-Local verification passed: repository checks (format, configuration, lint,
-TypeScript type checks, tests and builds); Flutter analysis and 70 mobile tests.
-These checks do not establish deployed delivery or physical-device acceptance.
+## Automated evidence
 
-- [CI](https://github.com/lihyin/agent-gateway/actions/runs/39058450281)
-- [Production delivery](https://github.com/lihyin/agent-gateway/actions/runs/39058457583)
-- [Previous iOS inspection](https://github.com/lihyin/agent-gateway/actions/runs/39058366102)
+Tests cover signed route issuance and sealing, wrong keys/epoch/audience/expiry,
+route tampering, notification size/generic text/fixed provider, and a real local
+Cloudflare Worker-runtime encrypted request/result WebSocket round trip with
+mocked APNs. The local stable runtime uses compatibility date 2026-08-06, while
+production Wrangler targets 2026-10-01. Flutter tests cover notification import
+without source access, disclosure filtering/encryption, registration/revocation,
+provider failures and the existing approval/replay pipeline.
 
-The previous signed iOS build `6acab70c546ce6236ced5af4` completed archive and
-publishing steps, but its TestFlight post-processing status is `failed`.
-It is not accepted as completed distribution.
+These tests establish neither live Apple delivery nor a real Muse installation.
+Native Swift compilation requires macOS/CI; device behavior requires an iPhone.
+See the final implementation report for commands actually run.
 
-## Verified relay deployment
+## Provider setup still required
 
-On October 17, 2026, staging and production independently returned the exact
-release candidate from `/health`, with the expected environment and
-`sourceAccessEnabled: false`. Both returned HTTP 404 for an unconfigured
-POST `/v1/device/sync`, as required.
+- Enable Apple Push Notifications for `com.agentbrain.agentgateway` and select
+  matching provisioning profiles. Set production APNs credentials on the relay.
+- Deploy the tested relay revision with the `CHANNELS` binding/class migration,
+  routing key and public pairing configuration.
+- Install the client inside the existing personal Muse runtime and complete real
+  fingerprint pairing. No separate server/domain is a prerequisite.
+- Install a matching signed iPhone build, connect Gmail, enable notifications,
+  and transfer its sealed delivery route to Muse.
 
-- Staging: `https://agent-gateway-relay-staging.agentbrain.workers.dev`
-- Production: `https://agent-gateway-relay-production.agentbrain.workers.dev`
+## Physical iPhone and Muse checks
 
-Signed iOS delivery is still running; this record does not claim TestFlight
-distribution completion.
+Record app revision/build, device/iOS version, date and outcome. Every row is
+currently pending physical/provider acceptance.
 
-## Required operator inputs
+| Check               | Expected behavior                                                                                          |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Install/configure   | Signed app launches; Gmail redirect and push registration work.                                            |
+| Pair                | Independent fingerprints match; cancelled/expired pairing fails closed.                                    |
+| Notify              | Muse's outbound client receives upgrade acceptance; generic alert arrives without private fields.          |
+| Tap/resume          | App imports a protected ciphertext request; Gmail fetch count remains zero before consent.                 |
+| Allow               | Access consent precedes fetch; disclosure approval precedes only filtered data returning to Muse.          |
+| Deny/edit           | Denial returns no messages; edits cannot widen scope and are filtered again.                               |
+| Offline/reconnect   | Same ID/ciphertext retries; no duplicate fetch; saved encrypted result can be handed off again.            |
+| Expiry              | Late notification/result fails; retries do not extend the original five minutes.                           |
+| Restart/lock        | Ciphertext receipt survives restart after receipt; source access requires unlocked app and domain consent. |
+| Disable/unpair      | Local acceptance/release stops; replacing relay pins invalidates the old route.                            |
+| Token/route refresh | New device token obtains a new route; expired/stale routes fail; operator conveys replacement to Muse.     |
+| Agent receipt       | Verified Muse-side result differs from relay transport acceptance; no source token reaches Muse.           |
 
-The persistent bridge host, public HTTPS origin, and host access method have not
-been supplied. No paired agent state file was found in the workspace's local
-tool directories. Do not create a fixture pairing or upload private agent state
-to the Worker. The phone and operator must complete real fingerprint verification.
-
-Once a host is selected, deploy the tested bridge under its operator account,
-generate separate random MCP/relay secrets, configure TLS, and complete pairing.
-Install the public transport configuration and relay secret in the selected
-Worker environment using [remote setup](remote-delivery.md). Keep the route
-unconfigured until these prerequisites exist.
-
-## Physical iPhone checks
-
-Record the installed app revision, build number, iOS version, date and outcome
-for each row. All rows below are currently **pending**, not passed.
-
-| Check                | Expected evidence                                                                              |
-| -------------------- | ---------------------------------------------------------------------------------------------- |
-| Install and launch   | TestFlight build matches the release candidate; Gmail configuration is available.              |
-| Pair fingerprints    | Trusted terminal and phone fingerprints match; rejected confirmation does not pair.            |
-| Opt in               | Device confirmation enables foreground delivery for this epoch and relay origin only.          |
-| Receive preview      | MCP job appears while app is open; Gmail is not fetched before access consent.                 |
-| Allow                | Review filtered fields, approve once, and verify only the approved result at MCP status.       |
-| Deny                 | Reject access/disclosure and verify denial without source messages at MCP status.              |
-| Edit                 | Remove/change allowed preview fields; verify filtering and the edited disclosure.              |
-| Retry/offline        | Disable connectivity, restore before expiry; same job/result does not fetch or disclose twice. |
-| Expiry               | Leave a job pending past five minutes; no fetch or result release occurs afterward.            |
-| Background/resume    | Polling stops when app is obscured; foreground resume retries within original expiry.          |
-| Disable/unpair       | No further signed polling; old epoch requests fail after re-pairing.                           |
-| Locked/restarted app | No source access while locked; protected state and deduplication survive restart.              |
-
-Use synthetic messages in a dedicated test Gmail account. Record only outcomes
-and identifiers in acceptance evidence, without message content, tokens, private
-keys, or access capabilities. Background push and Muse account integration remain
-outside this foreground acceptance scope.
+Use a dedicated synthetic Gmail test account. Record outcome metadata, not email
+content, credentials, private keys, route tokens or authenticated proofs.

@@ -1,11 +1,15 @@
 # Pairing and foreground encrypted delivery
 
-Implemented: one device/agent pairing with two-way fingerprint comparison,
-device authentication, pinned public keys, and manual encrypted request/result
-transfer through the existing Gmail consent/review pipeline. Not implemented:
-APNs, routing capabilities, or background delivery. Optional foreground relay forwarding is described in [remote setup](remote-delivery.md).
+Pairing pins one device and one agent with two-way fingerprint comparison and
+device authentication. Automatic relay-only APNs delivery is implemented; see
+[setup](remote-delivery.md). The agent client runs inside Muse, without a hosted
+bridge or callback server. This page also documents manual encrypted transfer as
+a fallback. Real provider/device acceptance remains required.
 
 ## Agent setup
+
+For production Muse delivery, run these commands inside Muse runtime. A local
+terminal is only a development/manual-transfer fallback. No hosted bridge is needed.
 
 Run `npm ci` and `npm run build --workspace agent-adapter`. The CLI is
 `agent-adapter/dist/src/cli.js`. Set a private, backup-excluded state path:
@@ -99,11 +103,9 @@ agent-side jobs/pinned device keys.
   credentials and device private keys are never exported.
 - Remove a stale agent `.lock` file after a crash only after verifying no process
   uses that state. Do not share one state file across users. Disk loss requires
-  re-pairing. Automatic relay delivery remains a separate implementation gate.
+  re-pairing. Relay-only notification transport uses the same protected domain pipeline.
 
 Cross-runtime fixtures verify real receipts and encrypted results with public,
 disposable test-only keys. Physical-device acceptance is still required: check
 fingerprint comparison/cancellation, Keychain persistence, locked-device behavior,
 and approval/export in TestFlight. Mock tests do not establish these checks.
-
-Optional authenticated foreground relay transfer is now implemented; see [remote setup](remote-delivery.md). APNs and background delivery remain unimplemented. The manual transfer flow above remains supported.

@@ -45,6 +45,7 @@ jobs:
       - run: npm ci
       - run: node scripts/verify-dart-crypto.mjs
       - run: node --import tsx scripts/verify-dart-pairing.mjs
+      - run: node --import tsx scripts/verify-dart-direct.mjs
       - working-directory: mobile
         run: flutter build apk --debug
   ios-build:

@@ -2,7 +2,7 @@
 
 This build supports iOS Gmail sign-in, local previews, and fingerprint-paired
 agent requests through manual foreground encrypted transfer. Approved results
-can be exported encrypted for that agent. Relay routes remain health-only.
+can be exported encrypted for that agent. Configured relay routes support APNs notifications and encrypted result return over Muse outbound connections.
 See [paired delivery](paired-delivery.md). Live provider/device acceptance remains
 required; mocked tests use synthetic agents/data.
 
@@ -77,7 +77,6 @@ can fail offline: local credentials are still deleted, and the app instructs the
 user to remove the grant in Google account settings. No live provider/device
 acceptance is claimed from mocked tests.
 
-Automatic delivery still requires routing capabilities, relay transport/push,
-and verified HTTPS callbacks. Manual encrypted transfer uses the same domain
+Automatic notification delivery uses the configured relay transport; see [relay-only setup](remote-delivery.md). Manual encrypted transfer uses the same domain
 pipeline. No plaintext upload, server OAuth vault, or web approval authority is
 provided.

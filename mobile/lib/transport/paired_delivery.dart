@@ -192,26 +192,48 @@ class PairedDelivery {
         await _save('transport.relay', value);
         _relay = value;
       });
-  Future<String> syncProof(
-    String origin,
-    List<String> knownRequests,
-    Map<String, dynamic>? result,
-  ) => _serial.run(() async {
-    _check();
-    if (!relayEnabled(origin)) throw const GatewayError('unpaired');
-    final now = clock().millisecondsSinceEpoch ~/ 1000;
-    return signObject(_identity!, {
-      'version': 1,
-      'audience': origin,
-      'deviceId': identityId(_identity!),
-      'agentId': _pair!['agentId'],
-      'pairingEpoch': _pair!['epoch'],
-      'issuedAt': now,
-      'expiresAt': now + 30,
-      'knownRequests': knownRequests,
-      'result': result,
-    }, 'agw+sync');
-  });
+  String? relayRoute(String origin) =>
+      relayEnabled(origin) ? (_relay?['route'] as String?) : null;
+  Future<void> saveRoute(String origin, String route, int expiresAt) =>
+      _serial.run(() async {
+        _check();
+        if (!relayEnabled(origin)) throw const GatewayError('unpaired');
+        final value = {..._relay!, 'route': route, 'expiresAt': expiresAt};
+        await _save('transport.relay', value);
+        _relay = value;
+      });
+  Future<String> registrationProof(String origin, String pushToken) =>
+      _serial.run(() async {
+        _check();
+        if (!relayEnabled(origin)) throw const GatewayError('unpaired');
+        final now = clock().millisecondsSinceEpoch ~/ 1000;
+        return signObject(_identity!, {
+          'version': 1,
+          'audience': origin,
+          'deviceId': identityId(_identity!),
+          'agentId': _pair!['agentId'],
+          'pairingEpoch': _pair!['epoch'],
+          'issuedAt': now,
+          'expiresAt': now + 30,
+          'pushToken': pushToken,
+        }, 'agw+register');
+      });
+  Future<String> resultProof(String origin, Map<String, dynamic> envelope) =>
+      _serial.run(() async {
+        _check();
+        if (!relayEnabled(origin) ||
+            envelope['context']['pairingEpoch'] != _pair!['epoch']) {
+          throw const GatewayError('unpaired');
+        }
+        final now = clock().millisecondsSinceEpoch ~/ 1000;
+        return signObject(_identity!, {
+          'version': 1,
+          'audience': origin,
+          'issuedAt': now,
+          'expiresAt': now + 30,
+          'envelope': envelope,
+        }, 'agw+result');
+      });
   Future<void> importRequest(String encoded, ReviewService review) =>
       _serial.run(() async {
         _check();

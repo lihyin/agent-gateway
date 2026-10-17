@@ -1,9 +1,8 @@
 # Protocol v1
 
-Pairing and nested JOSE support manual foreground request/result transfer through
-the mobile authorization pipeline. The relay remains health-only; signed route
-issuance and automatic push/HTTPS forwarding are not implemented. See
-[paired delivery](../docs/paired-delivery.md).
+Pairing and nested JOSE now support relay-only APNs delivery and encrypted return
+over a Muse-runtime outbound connection. See [transport API](../docs/api.md),
+[architecture](../docs/architecture.md) and [setup](../docs/remote-delivery.md).
 
 All times are integer UTC Unix seconds. IDs are opaque UUIDs. Unknown fields and
 versions are rejected. Request lifetime is at most 300 seconds; expiry is exclusive.
@@ -28,14 +27,16 @@ execution. A changed envelope under a reserved ID is rejected. Identical retries
 return the saved encrypted outcome, never repeat retrieval. Keep replay records
 beyond expiry (24 hours); a restart cannot reopen completed requests.
 
-Route claims are signed separately with a relay-only key. They contain verified
-HTTPS callback origin, registered push destination, pinned endpoint IDs, epoch,
-and a maximum 24-hour expiry. Issuance requires device key ownership and verified
-callback ownership. Caller-supplied callback addresses never override a route.
-Routes do not grant Gmail access; local unpairing is immediately authoritative.
+Routing capabilities are sealed with relay-only dir/A256GCM JWE. They bind the
+relay audience, registered APNs token, paired IDs/epoch and a 24-hour expiry.
+Issuance requires a pinned-device ES256 ownership proof. Agent submission and
+device result proofs are separately signed and last at most 30 seconds. Neither
+caller-supplied callbacks nor replacement recipient keys are accepted. An internal
+live connection object routes ciphertext to the original Muse socket without
+persisting request/result bodies. Endpoints own recovery and durable replay state.
 
 Acknowledgments confirm encrypted transport handoff only, not device execution,
 approval, or recipient receipt. Denials/errors contain no source data and are
 encrypted like successful results. Unknown versions, expiry, authentication,
-oversize data, replay, revoked pairing, invalid scope, and callback failure have
+oversize data, replay, revoked pairing, invalid scope, and live-channel failure have
 fixed error codes. Raw provider errors are never returned.

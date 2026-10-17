@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { openBridge } from "./store.js";
+import { relayRequest } from "./relay-client.js";
 
 const path = process.env.GATEWAY_AGENT_STATE;
 if (!path)
@@ -24,6 +25,18 @@ try {
     case "request":
       result = await bridge.request(JSON.parse(await readFile(input, "utf8")));
       break;
+    case "relay-request": {
+      const { requestId, ...scope } = JSON.parse(await readFile(input, "utf8"));
+      if (typeof requestId !== "string") throw new Error("invalid_request");
+      const job = await bridge.request(scope, requestId);
+      result = await relayRequest(
+        bridge,
+        job.requestId,
+        process.env.RELAY_URL ?? "",
+        process.env.RELAY_ROUTE ?? "",
+      );
+      break;
+    }
     case "submit":
       result = await bridge.submit(JSON.parse(await readFile(input, "utf8")));
       break;

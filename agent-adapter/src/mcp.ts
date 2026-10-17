@@ -33,13 +33,17 @@ async function response(task: () => Promise<unknown>) {
     };
   }
 }
-export function createMcpServer(bridge: Bridge, automatic = false): McpServer {
+export function createMcpServer(
+  bridge: Bridge,
+  automatic = false,
+  onRequest?: (id: string) => void,
+): McpServer {
   const server = new McpServer(
     { name: "agent-gateway", version: "1.0.0" },
     {
       maxToolInputElements: 64,
       instructions: automatic
-        ? "Gmail requests await approval in the paired iPhone app. Keep the app open for automatic encrypted relay transfer. Poll gateway_request_status for pending review; pending is never a successful search. Only phone-approved data is returned. Never request credentials or approval overrides."
+        ? "Gmail requests send a notification through the relay. Open the paired iPhone app to review access and disclosure. Poll gateway_request_status; pending is never a successful search. Only phone-approved data is returned. Never request credentials or approval overrides."
         : "Device-owned Gmail approval. Requests require foreground encrypted transfer to the paired iPhone and explicit device consent. Pending review is not a completed search. Only verified device-approved results are returned. Pairing is operator-managed; no source credentials are accepted.",
     },
   );
@@ -77,6 +81,8 @@ export function createMcpServer(bridge: Bridge, automatic = false): McpServer {
           { source: "gmail", operation: "search", ...arguments_ },
           requestId,
         );
+        if (result.status === "pending_device_review")
+          onRequest?.(result.requestId);
         return automatic
           ? { requestId: result.requestId, status: result.status }
           : result;

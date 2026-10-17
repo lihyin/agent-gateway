@@ -233,7 +233,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
               Text(
                 entry.request.agentId == 'device-owner'
                     ? 'Approved locally. No data has been transmitted to an agent.'
-                    : 'Approved for the paired agent. Export the encrypted result to deliver it.',
+                    : 'Approved for the paired agent. Relay delivery sends the encrypted result when enabled; manual export is also available.',
               ),
             if (!expired &&
                 entry.request.agentId != 'device-owner' &&
@@ -271,7 +271,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'Connect Gmail to review a bounded preview. Pair an agent for encrypted transfer. Enable relay delivery to receive requests and send approved results while this app is open.',
+                      'Connect Gmail and pair Meta Muse. Enable relay delivery for request notifications. Open this app to review access and approve filtered results.',
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -346,14 +346,19 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                       ] else ...[
                         if (c.relay != null)
                           SwitchListTile(
-                            title: const Text(
-                              'Relay delivery while app is open',
-                            ),
+                            title: const Text('Relay notifications'),
                             subtitle: const Text(
-                              'Approved results are sent automatically to the paired agent. Keep this app open; background push is not available.',
+                              'Notifications never grant Gmail access. Open the app to review; approved results return through the relay to Muse.',
                             ),
                             value: c.relayEnabled,
                             onChanged: c.busy ? null : c.enableRelay,
+                          ),
+                        if (c.relayEnabled)
+                          TextButton(
+                            onPressed: c.busy ? null : c.refreshRelayRoute,
+                            child: const Text(
+                              'Refresh and copy Muse delivery route',
+                            ),
                           ),
                         Text(
                           'Agent fingerprint: ${c.delivery!.agentFingerprint}',
@@ -476,6 +481,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
     'relay_unavailable' => 'Relay delivery is unavailable. Keep the app open to retry before the request expires.',
     'relay_configuration_required' =>
       'Relay delivery needs a configured HTTPS relay in this build.',
+    'notifications_unavailable' => 'Enable notifications for Agent Gateway in iPhone Settings, then refresh the delivery route.',
     'unpaired' => 'The request does not match the current paired agent.',
     'replay_changed_content' =>
       'This request identity was already used or its content changed.',

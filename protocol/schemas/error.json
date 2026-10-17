@@ -2,18 +2,19 @@
   "$id": "https://agent-gateway.invalid/protocol/v1/error",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "error"],
+  "required": ["error"],
   "properties": {
-    "version": { "const": 1 },
     "error": {
       "enum": [
         "invalid_request",
-        "unauthenticated",
-        "unsupported_version",
+        "unauthorized",
         "oversize",
-        "expired",
-        "invalid_route",
-        "transport_failed"
+        "websocket_required",
+        "replay",
+        "transport_unavailable",
+        "agent_offline",
+        "not_found",
+        "method_not_allowed"
       ]
     }
   }

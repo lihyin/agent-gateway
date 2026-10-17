@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "tsx src/server.ts",
     "mcp": "tsx src/mcp-server.ts",
-    "remote": "tsx src/remote-server.ts",
     "agent": "tsx src/cli.ts",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
@@ -13,6 +12,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.2",
     "tsx": "^4.0.0"
   },
   "dependencies": {
@@ -20,6 +20,7 @@
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "jose": "^6.2.12",
+    "ws": "^8.22.0",
     "zod": "^4.6.5"
   }
 }

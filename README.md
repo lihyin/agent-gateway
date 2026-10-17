@@ -1,31 +1,53 @@
 # Agent Gateway
 
-Agent Gateway lets third-party agents such as Meta Muse request controlled access to private data. A stateless Cloudflare Worker transports end-to-end encrypted requests and results. A Flutter mobile app owns credentials, connectors, policy enforcement, minimization, PII filtering, and approval.
+Agent Gateway lets Meta Muse request bounded Gmail data through one Cloudflare
+relay. The relay sends a generic iPhone notification. You open the app, authorize
+Gmail access, review a filtered preview, and approve or deny disclosure. The app
+returns an encrypted result through the relay to Muse's outbound connection.
 
-The relay has no Gmail tokens, plaintext private data, or payload decryption keys.
+**No separately hosted bridge, callback server, extra domain, or always-on PC is
+required.** Agent-side encryption/decryption runs inside Muse's existing runtime.
+Gmail credentials and phone private keys stay on the iPhone. The relay cannot
+fetch Gmail, read private payloads or grant approval.
 
-The relay defaults to health-only; optional authenticated foreground forwarding and a remote MCP bridge are implemented (see [remote setup](docs/remote-delivery.md)). The mobile app includes iOS Gmail sign-in, bounded review with access consent, filtering, and Allow/Deny/Edit/Always, plus authenticated pairing and foreground encrypted request/result transfer to one agent bridge. Background push is not implemented; foreground relay delivery requires operator configuration and device opt-in. Live sign-in requires your public Google iOS OAuth client configuration and physical-device validation. See [paired delivery](docs/paired-delivery.md), [Gmail setup](docs/gmail-setup.md), and [milestone status](docs/milestones.md).
+The relay uses an internal Cloudflare Durable Object for bounded live connection
+coordination, without an application database or request/result mailbox. This is
+an explicit revision of the earlier strictly stateless/callback-only design.
+Endpoints retain durable request/replay/result state and retry within five minutes.
 
-The plan establishes production delivery on Day 1: Cloudflare relay, GitHub Actions CI/CD orchestration, Codemagic Android/iOS builds/signing/distribution, and Docker Compose for local development.
+Implemented: authenticated pairing, nested JOSE encryption, device-local Gmail
+OAuth/review, APNs notification transport, native iOS ciphertext inbox, signed
+result return, outbound CLI and optional local stdio MCP. Real Muse account
+installation, live APNs and physical-device acceptance remain unverified. Android
+push is not implemented. The deployed release does not automatically acquire
+these new changes until the tested revision is released and configured.
 
-- [Product specification](SPEC.md)
-- [Development plan](PLAN.md)
-- [Development rules](RULE.md)
+- [Relay-only setup](docs/remote-delivery.md)
 - [Architecture](docs/architecture.md)
+- [API](docs/api.md)
 - [Security](docs/security.md)
-- [Production account setup and delivery](docs/production-setup.md)
-- [Day 1 API](docs/api.md)
-- [Day 1 validation status](docs/day1-status.md)
-- [Protocol v1](protocol/README.md)
-- [Device-local Gmail and approval setup](docs/gmail-setup.md)
-- [Meta Muse compatibility and integration prerequisites](docs/meta-muse.md)
-- [Pairing and encrypted foreground delivery](docs/paired-delivery.md)
-- [Local MCP server and tool testing](docs/mcp.md)
+- [Pairing and manual fallback](docs/paired-delivery.md)
+- [Gmail setup](docs/gmail-setup.md)
+- [MCP usage](docs/mcp.md)
+- [Muse compatibility](docs/meta-muse.md)
+- [Acceptance checks](docs/foreground-acceptance.md)
+- [Protocol](protocol/README.md)
+- [Specification](SPEC.md), [plan](PLAN.md), [rules](RULE.md)
+- [Production delivery](docs/production-setup.md), [historical Day 1 evidence](docs/day1-status.md)
 
-## Local development
+## Development
 
-Install Node.js 22, Flutter 3.47.6, and Docker with Compose. Run `npm ci`, then `npm run check`. Start the local services with `docker compose up --build --wait`; run `node scripts/smoke.mjs` to check them. Relay health: `http://localhost:8787/health`; mock providers: port 8788; demo agent: port 8789. Use `docker compose down` when finished. No production credentials are needed locally.
+Use Node 22, Flutter 3.47.6 and Docker Compose. Run `npm ci` and `npm run check`.
+The Node suite includes a real local Worker-runtime encrypted WebSocket round trip
+with mocked APNs. Its stable Miniflare runtime uses compatibility date 2026-08-06;
+the deployed Worker targets 2026-10-01. The test does not establish live APNs.
 
-For mobile, run `flutter pub get`, `flutter analyze`, `flutter test`, and `flutter run` from `mobile/`. Native Android requires its SDK; iOS builds/signing use a Mac or Codemagic. Release builds use `ENVIRONMENT`, `RELAY_URL`, and `RELEASE_SHA` Dart defines; secrets are never embedded in app configuration.
+From `mobile`, run `flutter pub get`, `flutter analyze`, and `flutter test`.
+Native iOS compilation/signing requires macOS or the existing CI/Codemagic flow.
+Codemagic uses `RELAY_URL`, `RELEASE_SHA`, `ENVIRONMENT` and the public
+`GOOGLE_IOS_CLIENT_ID`. Private transport/provider secrets belong on the Worker.
 
-CI runs on pull requests and pushes to `main`/`relay-architecture`. The manually dispatched **Production delivery** workflow verifies its revision, deploys staging/production Workers, and orchestrates only the Codemagic `ios-release` workflow. Android signing and distribution are deferred; Android debug-build CI checks remain enabled. Configure the production GitHub environment and iOS signing/distribution accounts before dispatching it.
+`docker compose up --build --wait` and `node scripts/smoke.mjs` exercise local
+health services. The mock/demo callback service is development scaffolding, not a
+production dependency. GitHub Actions deploys tested relay revisions and
+orchestrates signed iOS TestFlight builds. Android distribution remains deferred.

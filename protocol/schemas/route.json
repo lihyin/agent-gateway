@@ -4,28 +4,26 @@
   "additionalProperties": false,
   "required": [
     "version",
-    "agent",
-    "device",
+    "audience",
+    "agentId",
+    "deviceId",
     "pairingEpoch",
-    "pushProvider",
     "pushToken",
-    "callbackOrigin",
     "issuedAt",
     "expiresAt"
   ],
   "properties": {
     "version": { "const": 1 },
-    "agent": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
-    "device": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
-    "pairingEpoch": { "type": "string", "format": "uuid" },
-    "pushProvider": { "enum": ["apns", "fcm"] },
-    "pushToken": { "type": "string", "minLength": 1, "maxLength": 512 },
-    "callbackOrigin": {
+    "audience": {
       "type": "string",
       "format": "uri",
       "pattern": "^https://",
       "maxLength": 200
     },
+    "agentId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "deviceId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "pairingEpoch": { "type": "string", "format": "uuid" },
+    "pushToken": { "type": "string", "pattern": "^[0-9a-f]{64,200}$" },
     "issuedAt": { "type": "integer", "minimum": 0 },
     "expiresAt": { "type": "integer", "minimum": 0 }
   }

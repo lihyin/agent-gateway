@@ -61,3 +61,34 @@ test("request envelopes enforce encoded byte budgets", () => {
     ),
   );
 });
+test("sealed route claims and handoff acknowledgment have no callback authority", () => {
+  const route = {
+    version: 1,
+    audience: "https://relay.example.com",
+    agentId: context.sender,
+    deviceId: context.recipient,
+    pairingEpoch: context.pairingEpoch,
+    pushToken: "a".repeat(64),
+    issuedAt: 100,
+    expiresAt: 86500,
+  };
+  validateProtocol("route", route, 100);
+  validateProtocol("ack", { status: "handed_off" }, 100);
+  assert.throws(() =>
+    validateProtocol(
+      "route",
+      { ...route, callbackOrigin: "https://attacker.example.com" },
+      100,
+    ),
+  );
+  assert.throws(() =>
+    validateProtocol(
+      "route",
+      { ...route, audience: "https://relay.example.com/path" },
+      100,
+    ),
+  );
+  assert.throws(() =>
+    validateProtocol("ack", { status: "callback_accepted" }, 100),
+  );
+});

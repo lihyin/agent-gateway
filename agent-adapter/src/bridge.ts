@@ -10,26 +10,12 @@ import {
   pairingOffer,
   publicIdentity,
   verifyObject,
+  signObject,
   type Context,
   type Envelope,
   type Identity,
 } from "./crypto.js";
 import { validateProtocol } from "./protocol.js";
-import { z } from "zod";
-
-const syncSchema = z
-  .object({
-    version: z.literal(1),
-    audience: z.string(),
-    deviceId: z.string(),
-    agentId: z.string(),
-    pairingEpoch: z.string().uuid(),
-    issuedAt: z.number().int().nonnegative(),
-    expiresAt: z.number().int().nonnegative(),
-    knownRequests: z.array(z.string().uuid()).max(20),
-    result: z.unknown(),
-  })
-  .strict();
 
 export type Job = {
   envelope: Envelope;
@@ -285,56 +271,41 @@ export class Bridge {
     await this.persist();
     return result;
   }
-  sync(
-    compact: string,
-    audience: string,
-  ): Promise<{ acknowledged: string | null; envelope: Envelope | null }> {
-    return this.run(async () => {
-      const pair = this.state.pairing;
-      if (!pair || Buffer.byteLength(compact) > 92000)
-        throw new Error("unpaired");
-      const proof = syncSchema.parse(
-        await verifyObject(pair.identity.signing, compact, "agw+sync"),
-      );
-      const now = this.clock();
-      if (
-        proof.audience !== audience ||
-        proof.deviceId !== (await identityId(pair.identity)) ||
-        proof.agentId !== (await identityId(this.state.identity)) ||
-        proof.pairingEpoch !== pair.epoch ||
-        proof.issuedAt > now ||
-        proof.expiresAt <= now ||
-        proof.expiresAt <= proof.issuedAt ||
-        proof.expiresAt - proof.issuedAt > 30 ||
-        !("result" in proof)
-      )
-        throw new Error("invalid_request");
-      let acknowledged: string | null = null;
-      if (proof.result !== null) {
-        // No plaintext crosses the relay, including in this acknowledgment.
-        const envelope = proof.result as Envelope;
-        await this.receive(envelope);
-        acknowledged = envelope.context.requestId;
-      }
-      const next = Object.values(this.state.jobs).find(
-        (job) =>
-          !job.result &&
-          job.envelope.context.expiresAt > now &&
-          !proof.knownRequests.includes(job.envelope.context.requestId),
-      );
-      return { acknowledged, envelope: next?.envelope ?? null };
-    });
-  }
   transportConfiguration(): Promise<Record<string, unknown>> {
     return this.run(async () => {
       const pair = this.state.pairing;
       if (!pair) throw new Error("unpaired");
       return {
         deviceSigningKey: publicIdentity(pair.identity).signing,
+        agentSigningKey: publicIdentity(this.state.identity).signing,
         deviceId: await identityId(pair.identity),
         agentId: await identityId(this.state.identity),
         pairingEpoch: pair.epoch,
       };
+    });
+  }
+  relayProof(id: string, route: string, audience: string): Promise<string> {
+    return this.run(async () => {
+      const job = this.state.jobs[id];
+      if (
+        !this.state.pairing ||
+        !job ||
+        job.envelope.context.expiresAt <= this.clock()
+      )
+        throw new Error("unknown_request");
+      const now = this.clock();
+      return signObject(
+        this.state.identity,
+        {
+          version: 1,
+          audience,
+          issuedAt: now,
+          expiresAt: now + 30,
+          route,
+          envelope: job.envelope,
+        },
+        "agw+request",
+      );
     });
   }
   status(id: string): Promise<Record<string, unknown>> {

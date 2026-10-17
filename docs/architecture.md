@@ -1,104 +1,92 @@
-﻿# Mobile-authoritative relay architecture
+# Relay-only Muse delivery
+
+The production topology has three participants: Meta Muse, the existing Cloudflare
+relay, and the iPhone. No separately hosted bridge, callback server, extra domain,
+or always-on personal PC is required. Agent-side code runs as an outbound client
+inside Muse's existing runtime. The local stdio MCP adapter is optional.
 
 ```text
-                  Third-party Agent
-                      Meta Muse
-                          |
-                   HTTPS / ciphertext
-                          v
-               +----------------------+
-               | Stateless Relay      |
-               | Cloudflare Worker    |
-               | NO Gmail token       |
-               | NO plaintext data    |
-               | NO decryption key    |
-               +----------+-----------+
-                          |
-                 encrypted request
-                      APNs / FCM
-                          v
-+------------------------------------------------+
-| Agent Gateway Mobile App (Flutter / Native)     |
-|                                                |
-| OAuth Vault ------> Data Connectors             |
-| Keychain/Keystore   Gmail / Drive / Calendar     |
-|                           |                    |
-|                           v                    |
-|                    Policy Engine               |
-|                    Data minimizer              |
-|                    PII filtering               |
-|                           |                    |
-|                           v                    |
-|                    Human Approval              |
-|                    Allow / Deny / Edit / Always |
-|                           |                    |
-|                    encrypted result            |
-+---------------------------+--------------------+
-                            |
-                            v
-                     Stateless Relay
-                            |
-                            v
-                         Meta Muse
+Muse runtime -- encrypted request / outbound WebSocket --> Cloudflare relay
+                                                            |
+                                                     APNs notification
+                                                            v
+                                                         iPhone
+                                                            |
+                                             review access, fetch Gmail directly,
+                                             filter, approve disclosure
+                                                            |
+Muse runtime <-- encrypted result on same WebSocket ----- relay
 ```
 
-The diagram groups capabilities. Execution checks policy before connector access, then checks disclosure after minimization and filtering. The mobile domain layer is authoritative; Flutter widgets only render and invoke it.
+## Waiting without a mailbox
 
-## Responsibilities
+A Cloudflare Durable Object coordinates each live request connection inside the
+relay deployment. It uses no Storage API or application database. Socket
+attachments contain only authenticated context and a ciphertext digest, never
+request/result bodies, push tokens, Gmail data or keys. Requests are forwarded
+directly into APNs; results are forwarded to the live Muse socket.
 
-| Component | Owns | Excludes |
-| --- | --- | --- |
-| Agent / adapter | Agent keys, request encryption, callback receiver, result decryption | User OAuth tokens and device private keys |
-| Worker | Transport authentication, envelope validation, signed routing verification, push sending, callback forwarding | Payload decryption, connectors, policy, approvals, persistent requests/results |
-| Mobile | OAuth vault, paired identities, connectors, policy, minimization, PII filtering, approval, replay ledger, audit | Exporting source credentials |
-| APNs / FCM | Best-effort delivery of encrypted envelopes | Plaintext private request content |
+This deliberately revises the earlier strictly stateless/callback-only design:
+the relay has transient connection coordination, but no durable request/result
+mailbox. A timer bounds the socket to the original request's five-minute expiry.
+Process replacement or connection loss can interrupt delivery. Muse retains its
+request and retries the same ID and ciphertext; the phone retains its protected
+review, replay ledger and encrypted result. No relay memory is needed for recovery.
+There is no status-polling database on the relay. MCP status reads agent-owned
+state inside Muse's runtime.
 
-The Worker needs provider credentials and a routing-signature secret. These transport secrets cannot decrypt payloads. Push destinations, identifiers, callback origins, and timing remain observable routing metadata; encryption does not hide them.
+## Authentication and routing
 
-## Stateless routing
+The phone and Muse-side client generate separate signing and encryption keys and
+complete fingerprint pairing. The operator pins both public signing keys, IDs
+and the epoch in the relay's `PAIRING_CONFIG`. This implementation supports one
+configured pairing per relay deployment. Private keys stay at the endpoints.
 
-The device generates payload keys locally and verifies the agent public keys through user-confirmed authenticated pairing. Each side pins the other's identity and keys.
+The phone signs a short-lived APNs registration request. The relay returns a
+24-hour routing capability sealed with a relay-only AES-256-GCM key. The sealed
+capability carries the APNs token, audience, paired identities and epoch; it is
+copied to the Muse-side client. It never grants Gmail access. Refresh the route
+after token changes or expiry. Re-pairing requires updating the relay's public
+configuration. Unpairing immediately revokes phone authorization, while transport
+revocation is completed by replacing the pinned epoch/configuration.
 
-A signed, expiring routing capability contains the push destination, paired key identifiers, and verified agent HTTPS callback origin. The agent retains it and submits it with requests. The Worker validates it without storing a device registry. Route metadata may be sealed with a separate transport key, which must never decrypt private payloads.
+Muse signs a fresh 30-second transport proof containing the sealed route and
+unchanged encrypted request. The relay verifies it before opening a request
+channel or sending APNs. The phone independently verifies/decrypts the nested
+JOSE envelope and enforces expiry/replay/scope before showing the review.
 
-Token refresh requires replacing the capability and communicating it to the paired agent. Local unpairing revokes data access immediately on the device. Immediate global revocation of a still-valid transport capability needs server state and is outside this design; short capability lifetimes limit that window.
+The phone signs each encrypted result submission. The relay authenticates the
+phone and matches the result to the original live connection's identities,
+epoch, request ID and timestamps. Muse verifies/decrypts and saves the approved
+result locally. A relay `handed_off` acknowledgment means socket handoff, not
+verified agent receipt. Endpoint retries are idempotent and never extend expiry.
 
-No database, durable queue, persistent mailbox, result polling endpoint, or reliance on Worker process memory is allowed. Durable request, result, policy, replay, and audit state lives on the endpoints.
+## Device behavior
 
-## Planned transport contract
+APNs receives a generic alert and a bounded encrypted envelope, at most 4096
+bytes including wrappers. Source, query, purpose and data never appear in alert
+text. APNs is best effort, not authorization or a guaranteed offline mailbox.
 
-- `GET /health`: relay health only.
-- `POST /v1/requests`: authenticated agent submits a routing capability and encrypted request envelope; the Worker forwards it through APNs/FCM. Provider acceptance means transport handoff, never execution or approval.
-- `POST /v1/results`: authenticated device submits an encrypted result bound to the route/request; the Worker forwards it to the verified agent callback.
+Native iOS code receives foreground alerts and notification taps. It also reads
+already delivered notifications when the app resumes. A bounded, backup-excluded,
+protected local ciphertext inbox survives process restart after receipt. The app
+imports requests only while open, connected to Gmail and opted into this pairing.
+Nothing in notification receipt or tapping fetches Gmail or approves disclosure.
 
-Outer envelopes contain version, opaque request ID, routing/key identifiers, expiry, cryptographic material, ciphertext, and transport authentication. Source, query, purpose, fields, and result status belong inside ciphertext. Bind direction, version, request ID, identities, and expiry cryptographically to prevent substitution and reflection. Choose a reviewed interoperable encryption/signature protocol in PR02; these documents do not implement algorithms.
+The app evaluates policy and requests access consent before Gmail retrieval,
+fetches directly using its Keychain credentials, minimizes and filters results,
+then obtains disclosure approval. Sender/snippet fields require local confirmation.
+Allow/Deny/Edit/Always and final expiry/epoch/revision checks remain in the common
+domain pipeline. The app sends encrypted outcomes while open and retries failed
+handoffs within original expiry. Background Gmail execution is not implemented.
 
-Callbacks must use verified HTTPS origins with restricted redirects and SSRF defenses. Results are encrypted for the pinned paired agent key, never an arbitrary replacement supplied by a request. The agent callback acknowledges receipt and deduplicates results. A REST/MCP adapter provides encryption and callbacks if the third-party agent cannot implement them directly.
+## Deployment and verification
 
-## Device execution
+Only the Cloudflare Worker and its internal live-channel binding are deployed as
+a server. GitHub Actions and Codemagic remain build/distribution services. APNs
+credentials and routing secrets belong in Worker secrets, never in Muse or phone
+builds. Source OAuth credentials remain exclusively on the phone.
 
-1. Authenticate paired sender, decrypt, validate scope/schema, and reject expiry/replay.
-2. Evaluate deterministic policy before source access. Obtain pre-access consent for sensitive retrieval; deny unknown agents/sources/operations.
-3. Fetch bounded data directly through the mobile connector using the vault.
-4. Minimize fields, time range, and result count; filter PII locally.
-5. Review candidate disclosure: Allow once, Deny, Edit, or Always. Edits cannot widen scope and must pass filtering again. Always creates a narrow, revocable local rule; high-risk requests still require confirmation.
-6. Recheck expiry, pairing, policy, approval, and final payload; record minimal local audit; encrypt only authorized data for the agent.
-7. Submit through the Worker. Denials/errors are encrypted and contain no source data.
-
-Low-risk automatic release requires a valid local policy or Always rule. High-risk requests require opening the app, local authentication, review, and confirmation.
-
-## Delivery and lifecycle
-
-Requests must fit the smaller push-provider payload budget after encryption, encoding, and wrappers. Enforce a conservative shared limit; reject oversize requests. Cloud storage retrieval is not implicitly available.
-
-Push can be delayed, duplicated, or dropped. Mobile background execution is not guaranteed. Use generic notification text, a protected local inbox after receipt, and foreground resume. Agent retries reuse the request ID; persistent device deduplication prevents repeated execution or conflicting disclosures. Expiry is checked before source access and release, with a default maximum request/approval lifetime of five minutes.
-
-Large encrypted results use HTTPS callbacks. If forwarding fails, retain bounded encrypted results on-device and retry within expiry. The agent owns timeout/receipt state. No Worker connection remains open while waiting for human approval. Offline requests may expire; this design offers no guaranteed offline mailbox.
-
-## Deployment
-
-Production deployment begins on Day 1. GitHub Actions runs checks, deploys the tested Cloudflare Worker with Wrangler, and orchestrates the Codemagic iOS build for the same commit. Android signing and distribution are currently deferred. Codemagic manages native builds, signing, and TestFlight distribution for iOS. GitHub Actions verifies completed build/distribution status rather than treating an accepted build trigger as success. The initial production relay exposes health only; source access remains disabled until the complete security pipeline is ready.
-
-Docker Compose runs the local Worker development service, mock providers, and demo-agent callback receiver. Flutter runs on the host/device; Codemagic provides the native iOS build environment. Compose is local tooling and introduces no production relay persistence. No NestJS backend, PostgreSQL database, or web approval authority is required.
-
-Separate staging/production settings and credentials; associate deployment versions and signed build artifacts with their source commit. Roll back relay versions with protocol compatibility checks; fix mobile releases through higher-version builds. Provider configuration, secure storage, OAuth redirects, and biometrics require physical-device validation. The MVP uses one authoritative mobile device per pairing; multi-device enrollment needs a separate design.
+See [setup](remote-delivery.md), [API](api.md), [security](security.md),
+[protocol](../protocol/README.md) and [acceptance](foreground-acceptance.md).
+Android/FCM transport and real personal-Muse installation remain unverified.

@@ -38,7 +38,10 @@ void main() {
       );
       expect(find.text('Agent Gateway'), findsOneWidget);
       expect(find.text('Release: tested-revision'), findsOneWidget);
-      expect(find.textContaining('Enable relay delivery'), findsOneWidget);
+      expect(
+        find.textContaining('Enable relay delivery for request notifications'),
+        findsOneWidget,
+      );
       await tester.pumpAndSettle();
       expect(
         tester

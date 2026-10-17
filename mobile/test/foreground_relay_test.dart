@@ -5,6 +5,7 @@ import 'package:agentgateway/approvals/review_service.dart';
 import 'package:agentgateway/transport/crypto.dart';
 import 'package:agentgateway/transport/foreground_relay.dart';
 import 'package:agentgateway/transport/paired_delivery.dart';
+import 'package:agentgateway/transport/push_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -49,7 +50,8 @@ void main() {
     );
     await review.initialize();
   });
-  test('opt-in relay authenticates polling, imports without fetching, and returns only an approved encrypted result', () async {
+
+  test('push imports ciphertext without Gmail access and returns only an approved encrypted outcome', () async {
     final context = {
       ...Map<String, dynamic>.from(f['context']),
       'requestId': uuid(),
@@ -61,78 +63,55 @@ void main() {
       context,
       Map<String, dynamic>.from(f['payload']),
     );
+    final notifications = FakePush()..queue.add(jsonEncode(envelope));
     var calls = 0;
     final relay = ForegroundRelay(
       origin,
       clock: () => now,
+      notifications: notifications,
       client: MockClient((request) async {
         calls++;
-        expect(request.url.toString(), '$origin/v1/device/sync');
         expect(request.followRedirects, false);
-        expect(request.headers['Content-Type'], 'application/jose');
+        expect(request.url.path, '/v1/results');
         final proof = await verifyObject(
           Map<String, dynamic>.from(publicIdentity(device)['signing']),
           request.body,
-          'agw+sync',
+          'agw+result',
         );
         expect(proof['audience'], origin);
-        expect(proof['pairingEpoch'], delivery.epoch(identityId(agent)));
-        if (calls == 1) {
-          expect(proof['result'], isNull);
-          return http.Response(
-            jsonEncode({'acknowledged': null, 'envelope': envelope}),
-            200,
-          );
-        }
-        if (calls == 2) {
-          expect(proof['knownRequests'], [context['requestId']]);
-          expect(proof['result'], isNull);
-          return http.Response(
-            jsonEncode({'acknowledged': null, 'envelope': null}),
-            200,
-          );
-        }
-        if (calls == 3) {
-          final result = Map<String, dynamic>.from(proof['result']);
-          expect(result.keys.toSet(), {'context', 'jwe'});
-          final expected = {
+        File('.dart_tool/direct-result.json').writeAsStringSync(
+          jsonEncode({
+            'proof': request.body,
+            'epoch': delivery.epoch(identityId(agent)),
+          }),
+        );
+        final result = Map<String, dynamic>.from(proof['envelope']);
+        expect(result.keys.toSet(), {'context', 'jwe'});
+        final payload = await decryptEnvelope(
+          agent,
+          publicIdentity(device),
+          result,
+          {
             ...context,
             'direction': 'result',
             'sender': context['recipient'],
             'recipient': context['sender'],
-          };
-          final payload = await decryptEnvelope(
-            agent,
-            publicIdentity(device),
-            result,
-            expected,
-            now,
-          );
-          expect(payload['status'], 'allowed');
-          expect(jsonEncode(payload), isNot(contains('person@example.com')));
-          return http.Response(
-            jsonEncode({
-              'acknowledged': context['requestId'],
-              'envelope': null,
-            }),
-            200,
-          );
-        }
-        expect(proof['result'], isNull);
-        return http.Response(
-          jsonEncode({'acknowledged': null, 'envelope': null}),
-          200,
+          },
+          now,
         );
+        expect(payload['status'], 'allowed');
+        expect(jsonEncode(payload), isNot(contains('person@example.com')));
+        return http.Response(jsonEncode({'status': 'handed_off'}), 202);
       }),
     );
     addTearDown(relay.close);
     await relay.sync(delivery, review);
-    expect(calls, 0);
+    expect(notifications.queue, hasLength(1));
     await delivery.enableRelay(origin, true);
     await relay.sync(delivery, review);
+    expect(notifications.queue, isEmpty);
     expect(source.fetches, 0);
-    await relay.sync(delivery, review);
-    expect(source.fetches, 0);
+    expect(calls, 0);
     final entry = (await review.entries()).single;
     final preview = await review.approveAccess(
       entry.request.id,
@@ -147,53 +126,76 @@ void main() {
     await relay.sync(delivery, review);
     await relay.sync(delivery, review);
     expect(source.fetches, 1);
-    await delivery.enableRelay(origin, false);
-    await relay.sync(delivery, review);
-    expect(calls, 4);
+    expect(calls, 1);
   });
-  test('cancelled opt-in and unpairing prevent signed network access; consent survives restart for the same epoch only', () async {
+  test('registration uses device proof, survives restart, and is revoked by unpairing', () async {
+    await delivery.enableRelay(origin, true);
+    final relay = ForegroundRelay(
+      origin,
+      clock: () => now,
+      notifications: FakePush(),
+      client: MockClient((request) async {
+        expect(request.url.path, '/v1/routes');
+        final proof = await verifyObject(
+          Map<String, dynamic>.from(publicIdentity(device)['signing']),
+          request.body,
+          'agw+register',
+        );
+        expect(proof['deviceId'], identityId(device));
+        expect(proof['pushToken'], 'a' * 64);
+        expect(proof['expiresAt'] - proof['issuedAt'], 30);
+        File('.dart_tool/direct-register.json').writeAsStringSync(
+          jsonEncode({
+            'proof': request.body,
+            'epoch': delivery.epoch(identityId(agent)),
+          }),
+        );
+        return http.Response(
+          jsonEncode({'route': 'opaque-route', 'expiresAt': 1000}),
+          200,
+        );
+      }),
+    );
+    addTearDown(relay.close);
+    expect(await relay.register(delivery), 'opaque-route');
+    await delivery.initialize();
+    expect(delivery.relayRoute(origin), 'opaque-route');
+    await delivery.unpair();
+    expect(delivery.relayRoute(origin), isNull);
+    await expectLater(
+      delivery.registrationProof(origin, 'a' * 64),
+      throwsA(anything),
+    );
+  });
+  test('denied local confirmation, invalid push and provider failures grant no Gmail access', () async {
     confirmation.allowed = false;
     await expectLater(delivery.enableRelay(origin, true), throwsA(anything));
-    expect(delivery.relayEnabled(origin), false);
     confirmation.allowed = true;
     await delivery.enableRelay(origin, true);
-    await delivery.initialize();
-    expect(delivery.relayEnabled(origin), true);
-    expect(delivery.relayEnabled('https://other.example.com'), false);
-    final proof = await delivery.syncProof(origin, [], null);
-    final decoded = await verifyObject(
-      Map<String, dynamic>.from(publicIdentity(device)['signing']),
-      proof,
-      'agw+sync',
+    final notifications = FakePush()..queue.add(jsonEncode({'messages': []}));
+    final relay = ForegroundRelay(
+      origin,
+      clock: () => now,
+      notifications: notifications,
+      client: MockClient((_) async => http.Response('failure', 503)),
     );
-    expect(decoded['expiresAt'] - decoded['issuedAt'], 30);
-    // Disposable fixture consumed by the TypeScript relay test when present.
-    File('.dart_tool/foreground-sync.json').writeAsStringSync(
-      jsonEncode({'proof': proof, 'epoch': delivery.epoch(identityId(agent))}),
-    );
-    await delivery.unpair();
-    expect(delivery.relayEnabled(origin), false);
-    await expectLater(delivery.syncProof(origin, [], null), throwsA(anything));
+    addTearDown(relay.close);
+    await expectLater(relay.sync(delivery, review), throwsA(anything));
+    expect(notifications.queue, isEmpty);
+    await expectLater(relay.register(delivery), throwsA(anything));
+    expect(source.fetches, 0);
+    expect(await review.entries(), isEmpty);
   });
-  test(
-    'network errors and plaintext replies do not approve or fetch Gmail',
-    () async {
-      await delivery.enableRelay(origin, true);
-      for (final response in [
-        http.Response('unavailable', 503),
-        http.Response(jsonEncode({'messages': []}), 200),
-        http.Response('x' * 8193, 200),
-      ]) {
-        final relay = ForegroundRelay(
-          origin,
-          clock: () => now,
-          client: MockClient((_) async => response),
-        );
-        await expectLater(relay.sync(delivery, review), throwsA(anything));
-        relay.close();
-      }
-      expect(source.fetches, 0);
-      expect(await review.entries(), isEmpty);
-    },
-  );
+}
+
+class FakePush implements PushNotifications {
+  final List<String> queue = [];
+  @override
+  Future<String> register() async => 'a' * 64;
+  @override
+  Future<List<String>> pending() async => List.of(queue);
+  @override
+  Future<void> acknowledge(String envelope) async {
+    queue.remove(envelope);
+  }
 }

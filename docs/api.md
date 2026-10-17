@@ -1,20 +1,42 @@
-# Day 1 API
+# Relay transport API
 
-## Relay
+The relay handles only encrypted transport. Gmail credentials, connector access,
+policy, reviews and approvals are phone-owned. No additional server is deployed.
+All routes require the configured exact HTTPS origin and reject browser Origin
+headers and URL query parameters. Private routes fail closed when unconfigured.
 
-`GET /health` returns HTTP 200 JSON with `status: "ok"`, `service: "agent-gateway-relay"`, `environment`, `revision`, and `sourceAccessEnabled: false`. Responses use `Cache-Control: no-store`. GitHub Actions supplies the tested commit as `RELEASE_SHA` during deployment.
+| Endpoint           | Authentication and behavior                                                                                                                                                                                                                                                                    |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /health`      | Existing public service/environment/revision health; `sourceAccessEnabled` remains false because the relay cannot access sources.                                                                                                                                                              |
+| `POST /v1/routes`  | `Content-Type: application/jose`, 30-second device ES256 proof of type `agw+register`. Registers the current APNs token and returns `{route, expiresAt}`. Route is encrypted with relay-only AES-256-GCM and expires after 24 hours.                                                           |
+| `GET /v1/requests` | WebSocket upgrade with `Authorization: Bearer <agw+request JWS>`. Proof binds audience, short transport lifetime, sealed route and encrypted request envelope. Relay verifies agent pins/route, forwards generic alert plus ciphertext to APNs and opens the return socket.                    |
+| `POST /v1/results` | `Content-Type: application/jose`, device proof of type `agw+result` binding audience, 30-second transport lifetime and encrypted result envelope. Returns HTTP 202 `{status: handed_off}` only after handing ciphertext to the matching live agent socket; otherwise HTTP 503 `agent_offline`. |
 
-Other methods on `/health` return HTTP 405 with `Allow: GET`. All other routes return HTTP 404, including `/v1/requests`, `/v1/results`, and OAuth paths. There are no source credentials, push calls, pairing routes, payload decryption, or authorization APIs in the foundation.
+Request/result envelope format remains protocol v1 nested signed JWS/encrypted
+JWE. Transport proofs have version 1, `audience`, integer UTC `issuedAt` and
+`expiresAt`. Unknown fields/types, wrong keys/epoch/audience, future-issued or
+expired proofs, and a transport lifetime over 30 seconds fail authentication.
 
-## Local development services
+Registration additionally binds `deviceId`, `agentId`, `pairingEpoch` and a
+hexadecimal `pushToken`. Agent request proofs carry only `route` and `envelope`
+beyond common fields. Result proofs carry only `envelope` beyond common fields.
+Neither payload contains a caller-selected callback address. Request proofs are
+limited to 16,000 header bytes; POST proofs to 92,000 bytes. Request envelopes
+remain at most 3500 bytes, result envelopes 65,536, and the complete APNs payload 4096. The original request's exclusive expiry is at most five minutes.
 
-The demo agent exposes `GET /health` with `callbackEnabled: false`; unfinished callbacks return HTTP 404 and retain no request bodies. Mock providers expose health and return HTTP 501 for unfinished operations. These services are local scaffolding; no provider integration is implemented.
+A `RequestChannel` Durable Object inside the same relay coordinates the live
+connection. No Storage API, request/result database, durable queue or polling
+mailbox is used. Socket metadata is context plus a ciphertext digest. A same-ID
+reconnect must preserve context and ciphertext while that channel is live; durable
+endpoint replay ledgers remain authoritative across relay resets. Duplicate
+result handoffs are allowed; only endpoints can establish verified receipt.
 
-## Protocol v1 design
+Errors are fixed JSON codes: `unauthorized` (401), `oversize` (413),
+`websocket_required` (426), `replay` (409), `transport_unavailable` or `agent_offline`
+(503), and disabled/unknown routes (404). No provider body, credentials, token,
+plaintext request or approved content enters an error response or relay logging.
+Push acceptance, review, disclosure approval and verified agent receipt are distinct.
 
-Closed request, result, envelope, context, route, acknowledgment, and error schemas
-are in [protocol/](../protocol/README.md). The selected standard nested JOSE
-algorithms and cross-runtime fixture are documented in
-[ADR 002](crypto-design.md). These contracts do not enable relay endpoints;
-pairing, route issuance, persistent replay protection, and forwarding remain
-separate implementation gates.
+Removed: `/v1/device/sync` and all separate hosted-bridge configuration.
+See [setup](remote-delivery.md), [architecture](architecture.md) and
+[protocol](../protocol/README.md).

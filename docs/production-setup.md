@@ -2,6 +2,12 @@
 
 Enter secrets directly in provider settings, never in chat or committed files. Confirm public identifiers and setup status to the development agent. The defaults below are provisional until you confirm ownership/availability.
 
+Current transport uses the existing Cloudflare relay only; no bridge server/domain
+is required. Before enabling APNs, follow [relay-only setup](remote-delivery.md)
+for push capability/profile prerequisites, Worker secrets, public pairing pins,
+the internal live-channel migration, and Muse-runtime client installation.
+Day 1 health-only evidence below is historical and does not establish new push acceptance.
+
 ## 1. Git identity and repository
 
 Provide the commit author name and email. Current release repository: `lihyin/agent-gateway`; default/release branch: `relay-architecture`. Enable GitHub Actions and allow the selected Actions used by CI. Add a `production` GitHub environment, restrict deployments to the intended trusted branch, and configure release reviewers if your team requires them. Release is explicitly dispatched from the selected branch, not triggered by pull requests.

@@ -1,87 +1,106 @@
 # Security boundaries
 
-## Trust model
+## Authorities and secrets
 
-Foreground pairing/delivery now pins one agent's signing/encryption keys after
-full fingerprint comparison and device authentication. The agent verifies the
-phone's signed receipt against its offer nonce/digest and a separately compared
-device fingerprint. Device keys/replay state stay in the device-only vault; agent
-keys use owner-restricted files and an exclusive process lock.
+The iPhone owns Gmail OAuth, connector execution, default-deny policy, access
+consent, minimization, deterministic PII filtering, disclosure approval and audit.
+Muse receives only approved data. Neither push delivery nor Muse-side permission
+can bypass phone authorization. Gmail tokens and phone private keys never leave
+the device-only vault. Muse-side keys and verified results remain inside Muse's
+runtime, under its account. No separately hosted bridge is required or supported.
 
-Manual transfer uses exact-header ES256 JWS inside RSA-OAEP-256/A256GCM JWE.
-Pinned identities/epoch, signed/outer context, direction, sizes and expiry are
-checked before review. Durable reservation precedes execution; changed same-ID
-ciphertext and disconnected review reopening fail closed. Export rechecks current
-approval revision/digest, pairing and expiry; retries return saved ciphertext.
-The agent verifies results against its pending request. No automatic push,
-route issuance, callback forwarding, or hardware-backed key operations are
-claimed. See [paired delivery](paired-delivery.md) for physical-device checks.
+The relay and APNs are untrusted for payload confidentiality and authorization.
+They observe transport metadata and can delay, duplicate or disrupt delivery.
+Nested ES256 JWS inside RSA-OAEP-256/A256GCM JWE pins signing/encryption identities,
+epoch, direction, request ID and original timestamps. Durable endpoint replay
+reservation precedes retrieval. Changed ciphertext under one ID fails closed.
+Release rechecks approval revision/digest, pairing and expiry. Retries reuse saved
+encrypted results and cannot repeat source access.
 
-The mobile domain layer enforces private-source access independently from UI widgets. Source tokens, device private keys, policies, pending approvals, replay history, and audit records remain on-device.
+## Relay-only transport
 
-The Worker and push providers are untrusted for payload confidentiality and authorization. They observe routing metadata and can disrupt delivery. A compromised relay must not decrypt payloads, impersonate paired identities, substitute recipient keys, change requests undetected, or authorize disclosure. The agent can retain data after decrypting an approved result; approval UI must make this disclosure boundary clear.
+The operator pins one paired device/agent's public signing keys and epoch in
+`PAIRING_CONFIG`. The device signs 30-second `agw+register` proofs containing its
+APNs token. The relay seals 24-hour routing capabilities using a separate
+32-byte AES-256-GCM routing key. This key never decrypts private request/results.
+Routes bind relay audience, both IDs, epoch and push destination. Tokens are
+replaced on APNs refresh/expiry and must be conveyed to Muse's runtime. Automatic
+route replacement distribution is not implemented.
 
-## Required controls
+The agent signs `agw+request` proofs carrying the sealed route and encrypted
+request. The relay verifies them before APNs or socket allocation. The device
+independently authenticates/decrypts before review. The device signs encrypted
+result submissions as `agw+result`. The relay matches full context to the active
+Muse connection; the Muse-side client verifies/decrypts and durably saves results.
+Unknown fields, algorithms, versions, keys, epochs, audiences, future issuance,
+expired proofs and oversized data fail closed. Transport proofs last at most
+30 seconds; original requests at most five minutes. Retries do not extend expiry.
 
-The stdio MCP server uses the paired bridge with no pairing, source-token or
-approval override tools. Closed tool schemas, JSON-RPC line/element limits and
-envelope budgets constrain inputs. Stable request IDs give identical retries
-without extending expiry. Results are verified against pinned identities, context,
-and original field/count/time scope. No HTTP listener or remote account linking
-is implemented. See [MCP setup](mcp.md).
+A Cloudflare Durable Object inside the relay coordinates a live receive-only
+WebSocket per request. There is no application database, Storage API usage,
+durable queue or result-polling mailbox. Attachments contain authenticated
+context and a ciphertext digest only. Ciphertext and APNs tokens are not retained
+in attachments. A timer bounds connection life to the original expiry. Relay
+resets/disconnections fail closed; endpoint state is authoritative for recovery.
+This transient coordination explicitly replaces the earlier strictly stateless
+callback architecture. No callback URLs, outbound arbitrary origins, hosted MCP
+endpoint, bridge bearer tokens or plaintext relay processing remain.
 
-- Authenticate pairing and pin keys. Use reviewed encryption/signature libraries and bind message direction, version, identities, request ID, and expiry.
-- Perform OAuth and refresh locally with PKCE, state, validated redirects, and minimum scopes. Never send source tokens through the relay.
-- Protect mobile secrets using platform secure storage. Define locked-device behavior, backup exclusions, rotation, source disconnect, and unpairing. Verify hardware-backed capabilities instead of assuming every key supports them.
-- Evaluate deterministic default-deny policy before connector access. Obtain consent for sensitive retrieval and review final filtered disclosures where required.
-- Restrict edits to authorized scope and rerun filtering. Bound and revoke Always rules; require explicit local confirmation for high risk.
-- Recheck expiry and pairing before source access and release. Persist replay protection across restarts and prevent duplicate/conflicting disclosures.
-- Use encrypted push envelopes and generic alerts. Display private details only inside the app after appropriate authentication.
-- Validate/authenticate bounded Worker envelopes and expiring routing capabilities. Restrict callbacks to verified HTTPS origins and block SSRF/unsafe redirects. Durable distributed rate limiting requires an explicit review of its state/metadata footprint; Worker memory is insufficient.
-- Store APNs/FCM and routing secrets through deployment secret management. They must not decrypt payloads. Redact capabilities, tokens, secrets, and payloads from telemetry.
-- Keep scoped Cloudflare deployment and Codemagic orchestration credentials in GitHub Actions secrets; keep Android/Apple signing and distribution credentials in Codemagic managed secret groups. Untrusted PR jobs cannot access release secrets. Deploy/build the verified commit, validate orchestration callback origin/authentication and revision correlation, and exclude secrets from logs/artifacts. Compose uses mock credentials and does not mount production signing secrets or device vaults.
-- Audit minimal metadata locally with retention controls. Deterministic PII filtering has incomplete coverage; do not promise perfect redaction.
+The only provider destination is the configured production/sandbox Apple APNs
+host. Redirects are manual and non-success responses fail; arbitrary callback
+SSRF is eliminated. Provider calls time out. Request envelope size is 3500 bytes,
+complete push 4096, result envelope 65,536 and POST proof 92,000. Error responses
+are fixed sanitized codes. Disable header/body logging and tracing that would
+capture authorization proofs, sealed routes, APNs tokens or payloads. Platform
+abuse controls beyond authentication, bounded inputs and connection expiry need
+operational validation; no distributed rate-limit guarantee is claimed.
 
-## Failures and limitations
+## Phone receipt and approval
 
-Unknown agents/scopes, tampering, wrong keys, replay, stale pairing, expired approvals, unsupported versions, and oversize envelopes fail closed. Offline/delayed push cannot trigger relay-side source access. Denials and errors are encrypted. The app owns bounded retries; the agent owns timeout and receipt state.
+Notifications contain generic alert text and ciphertext, never source/query,
+purpose, preview, approval actions or credentials. Native code receives alerts,
+taps and already delivered notifications on resume. It stores at most 20 encrypted
+envelopes in an atomic backup-excluded Application Support file protected until
+first unlock after boot. This inbox contains no decrypted payloads or keys;
+Keychain remains the protected authority for reviews, source tokens and keys.
+Expiry prunes the native inbox; successful domain import is acknowledged before
+removing the notification. Native storage failure grants nothing: Muse retries.
 
-Local unpairing immediately denies access on-device, but stateless routing cannot instantly revoke previously issued transport capabilities globally. Short capability lifetimes limit that window. Device loss requires re-pairing and reconnecting sources; the relay cannot recover payload private keys.
+Notification receipt/tap never executes Gmail. Imports happen in the foreground
+after local opt-in for the current epoch/origin and Gmail connection. Policy and
+access consent precede direct Google requests. Sensitive fields require local
+authentication. Filtering and user disclosure approval precede encrypted release.
+Edit cannot widen scope and is filtered again. Exact-scope Always rules last at
+most 24 hours and cannot bypass source consent, high risk or expiry. Disconnect
+cancels local reviews; unpair immediately stops local acceptance/release.
 
-## Required verification
+Approved or denied encrypted outcomes are sent while the app is open. Failed
+handoffs retry on foreground refresh within original expiry. HTTP 202 means
+socket handoff, not verified agent receipt. Restart can repeat a handoff; the agent
+deduplicates and checks original scope. A verified recipient can retain disclosed
+data; already released data cannot be revoked.
 
-The protocol design gate selects nested ES256 JWS inside RSA-OAEP-256/A256GCM
-JWE, with separate signing/encryption keys and pinned identities. Public test-only
-fixtures exercise TypeScript-to-Dart and Dart-to-TypeScript interoperability.
-Closed schemas reject unknown fields/versions and bound payload sizes/expiry.
-See [ADR 002](crypto-design.md) for algorithm restrictions, key rotation, and the
-absence of forward secrecy. Pairing and protected foreground replay/key storage
-are implemented separately; fixture success does not establish native-device
-acceptance or automatic transport.
+## Other controls and limitations
 
-Test cross-agent/device access, key substitution, context tampering, reflection, replay after restart, revoked pairing, expired approvals, Edit/Always escalation, connector bounds, PII/credential leakage, OAuth redirects/state, callback SSRF, and push/log content. Add cross-runtime crypto fixtures and physical iOS/Android checks for locked/killed apps, secure storage, push delays/duplicates, and biometrics.
+Native AppAuth owns PKCE/state and validated redirects. Only Gmail read-only is
+requested, with no credential export. Device-only unlocked Keychain stores
+credentials/reviews; Android backup is disabled. The iOS shared HTTP disk cache is
+disabled, and previews are obscured in the app switcher. High-risk release requires
+local confirmation. PII filtering is deterministic and incomplete; users must
+review proposed disclosure. Key generation uses JOSE libraries; hardware-backed
+private-key operations and forward secrecy are not claimed.
 
-The relay defaults to health only and enables foreground sync only with explicit operator configuration; the demo
-adapter does not accept callbacks. Mobile supports configured iOS Gmail OAuth,
-local previews and paired foreground requests. Native AppAuth owns PKCE/state
-and redirect validation; Google credentials and pending reviews live in
-device-only unlocked Keychain storage. Requests are bounded/default-deny, checked
-before and during retrieval and after device confirmation, then minimized and
-filtered. Allow/Deny/Edit/Always bind candidate revision/digest and current epoch.
-State-write failure fails closed; replay survives restart and interrupted fetches
-do not repeat. Exact-scope rules expire after 24 hours and cannot bypass source
-consent or high-risk confirmation. Explicit encrypted export delivers approved
-results to the pinned agent. Automatic push remains incomplete; optional foreground relay handoff is described below.
-See [Gmail setup](gmail-setup.md) for scope, retention, provider configuration,
-filtering coverage, and outstanding physical-device acceptance.
+Local unpairing immediately revokes data access. Updating relay pins/epoch revokes
+old transport routes globally; without that update a valid old route can still
+send notifications until expiry. Missing notifications, offline phones, dropped
+connections and provider failures may cause request expiry. No durable offline
+mailbox or guaranteed background execution is promised. Android/FCM, live APNs,
+physical iPhone behavior and real Muse installation require separate acceptance.
 
-Release Gradle configuration requires actual signing credentials with no
-debug-key fallback. CI has read-only repository permissions; production secrets
-belong only to trusted release jobs and provider settings. The complete agent
-private-data security pipeline is not yet implemented or independently audited.
+GitHub release secrets belong only to trusted environment jobs, and Codemagic
+holds signing credentials. Local Compose uses mock data. Native push capability,
+entitlements, signing profiles and APNs environment must agree. Missing account
+configuration is a release blocker. The app is not independently security-audited.
 
-## Optional foreground relay and remote MCP
-
-The configured sync route verifies ES256 device proofs bound to the pinned device, agent, epoch and relay audience, expiring within 30 seconds. The bridge independently verifies proofs and encrypted results. Proof retries are permitted within that interval; durable request/result deduplication preserves original expiry. The relay stores no mailbox. A fixed HTTPS bridge origin, no redirects, bounded bodies and timeouts constrain forwarding. Network and malformed upstream failures return sanitized transport errors.
-
-Remote MCP requires a distinct bearer token from relay transport, exact Host and Origin checks, POST-only bounded JSON, and a TLS reverse proxy. Remote tools expose job creation and status, never pairing or encrypted result submission. The bridge owns private agent keys and approved plaintext; deploy it under the operator's account, outside the relay. Mobile opt-in requires local confirmation and is bound to the current pairing epoch and relay origin. Foreground polling imports requests without authorizing source access and sends only locally approved encrypted outcomes. No OAuth account linking, background push, production hosting, or physical-device validation is claimed. See [setup](remote-delivery.md).
+See [architecture](architecture.md), [setup](remote-delivery.md),
+[crypto decision](crypto-design.md) and [acceptance](foreground-acceptance.md).

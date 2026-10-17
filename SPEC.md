@@ -1,4 +1,4 @@
-﻿# Agent Gateway
+# Agent Gateway
 
 ## Problem
 
@@ -6,7 +6,7 @@ Users want agents such as Meta Muse to perform useful tasks with Gmail and other
 
 ## Solution
 
-A mobile-authoritative gateway runs in Flutter with native iOS/Android security integrations. A stateless Cloudflare Worker relays encrypted requests through APNs/FCM and encrypted results over HTTPS. OAuth credentials and payload private keys remain in the mobile Keychain/Keystore-backed vault.
+A mobile-authoritative gateway runs in Flutter with native iOS/Android security integrations. A Cloudflare Worker is the only server: it sends encrypted request notifications through APNs and returns encrypted results over an outbound connection from Muse. An internal live-channel object coordinates in-flight delivery without a request/result database or mailbox. No separate bridge host or domain is required. OAuth credentials and payload private keys remain in the mobile Keychain/Keystore-backed vault.
 
 The app calls Gmail, Drive, and eventually Calendar directly, evaluates local policy, minimizes data, filters PII, and presents the proposed disclosure for Allow, Deny, Edit, or Always approval. Only the authorized result is encrypted for the paired agent and returned through the relay.
 
@@ -16,7 +16,7 @@ Production delivery starts on Day 1 with a Cloudflare health-only relay and sign
 
 - Authenticated pairing of one device with a demo agent.
 - Device-local Gmail OAuth and connector execution.
-- Encrypted push requests and HTTPS callback results.
+- Encrypted APNs requests and signed HTTPS result submissions returned to the original Muse outbound socket.
 - Deterministic local authorization, bounded retrieval, minimization, and PII filtering.
 - Human approval, safe edits, scoped revocable Always rules, and local audit.
 - Agent-side REST adapter, followed by MCP using the identical authorization pipeline.

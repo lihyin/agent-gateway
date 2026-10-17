@@ -57,15 +57,15 @@ export function validateProtocol(
   )
     throw new Error("invalid_request");
   if (name === "route") {
-    const callback = new URL(record.callbackOrigin as string);
+    const audience = new URL(record.audience as string);
     if (
-      callback.origin !== record.callbackOrigin ||
-      callback.username ||
-      callback.password ||
-      callback.port ||
-      /^\d+\./.test(callback.hostname) ||
-      !callback.hostname.includes(".") ||
-      callback.hostname.endsWith(".local")
+      audience.origin !== record.audience ||
+      audience.username ||
+      audience.password ||
+      audience.port ||
+      /^\d+\./.test(audience.hostname) ||
+      !audience.hostname.includes(".") ||
+      audience.hostname.endsWith(".local")
     )
       throw new Error("invalid_route");
   }

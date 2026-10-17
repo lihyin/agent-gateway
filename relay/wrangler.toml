@@ -3,6 +3,14 @@ main = "src/index.ts"
 compatibility_date = "2026-10-01"
 workers_dev = true
 
+[[migrations]]
+tag = "v1-channels"
+new_sqlite_classes = ["RequestChannel"]
+
+[[env.local.durable_objects.bindings]]
+name = "CHANNELS"
+class_name = "RequestChannel"
+
 [env.local.vars]
 ENVIRONMENT = "local"
 RELEASE_SHA = "local"
@@ -10,6 +18,9 @@ RELEASE_SHA = "local"
 [env.staging]
 name = "agent-gateway-relay-staging"
 workers_dev = true
+[[env.staging.durable_objects.bindings]]
+name = "CHANNELS"
+class_name = "RequestChannel"
 [env.staging.vars]
 ENVIRONMENT = "staging"
 RELEASE_SHA = "unconfigured"
@@ -17,6 +28,9 @@ RELEASE_SHA = "unconfigured"
 [env.production]
 name = "agent-gateway-relay-production"
 workers_dev = true
+[[env.production.durable_objects.bindings]]
+name = "CHANNELS"
+class_name = "RequestChannel"
 [env.production.vars]
 ENVIRONMENT = "production"
 RELEASE_SHA = "unconfigured"
