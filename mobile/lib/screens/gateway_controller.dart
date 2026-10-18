@@ -9,6 +9,7 @@ import '../connectors/gmail_connector.dart';
 import '../domain/gateway_configuration.dart';
 import '../domain/gateway_error.dart';
 import '../domain/gmail_request.dart';
+import '../domain/muse_skill.dart';
 import '../transport/paired_delivery.dart';
 import '../transport/foreground_relay.dart';
 import '../transport/pin_pairing.dart';
@@ -79,6 +80,12 @@ class GatewayController extends ChangeNotifier {
   bool get relayEnabled =>
       relay != null && (delivery?.relayEnabled(relay!.origin) ?? false);
   String? exported;
+  String? get museSkill => relay == null || delivery?.agentId == null
+      ? null
+      : museGmailSkill(
+          origin: relay!.origin,
+          route: delivery!.relayRoute(relay!.origin),
+        );
   bool connected = false, busy = false, ready = false;
   String? error;
   List<ReviewEntry> entries = [];

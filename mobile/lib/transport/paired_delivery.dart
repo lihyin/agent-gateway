@@ -197,7 +197,11 @@ class PairedDelivery {
         _relay = value;
       });
   String? relayRoute(String origin) =>
-      relayEnabled(origin) ? (_relay?['route'] as String?) : null;
+      relayEnabled(origin) &&
+          (_relay?['expiresAt'] as int? ?? 0) >
+              clock().millisecondsSinceEpoch ~/ 1000
+      ? (_relay?['route'] as String?)
+      : null;
   Future<void> saveRoute(String origin, String route, int expiresAt) =>
       _serial.run(() async {
         _check();

@@ -160,6 +160,8 @@ void main() {
     expect(await relay.register(delivery), 'opaque-route');
     await delivery.initialize();
     expect(delivery.relayRoute(origin), 'opaque-route');
+    now = DateTime.fromMillisecondsSinceEpoch(1000000, isUtc: true);
+    expect(delivery.relayRoute(origin), isNull);
     await delivery.unpair();
     expect(delivery.relayRoute(origin), isNull);
     await expectLater(

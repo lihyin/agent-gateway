@@ -102,6 +102,16 @@ data; already released data cannot be revoked.
 
 ## Other controls and limitations
 
+The user-initiated Muse clipboard handoff combines a temporary pairing setup line
+with reusable Gmail instructions. The instructions require discarding the code,
+preserving private agent state, phone consent and verified results. Subsequent
+skill copies contain no pairing code and omit expired delivery routes. Enabling
+notifications or refreshing a route copies the skill and sealed route together;
+clipboard success is confirmed only after the write completes. These messages
+belong only in the user's trusted Muse chat. Clipboard/chat retention is outside
+the vault's protection; the app does not automatically paste or send to Muse.
+The skill is guidance, not authorization or evidence of runtime installation.
+
 Native AppAuth owns PKCE/state and validated redirects. Only Gmail read-only is
 requested, with no credential export. Device-only unlocked Keychain stores
 credentials/reviews; Android backup is disabled. The iOS shared HTTP disk cache is

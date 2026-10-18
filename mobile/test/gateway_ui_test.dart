@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agentgateway/main.dart';
 import 'package:agentgateway/approvals/review_service.dart';
@@ -69,7 +70,32 @@ void main() {
       )..status = 'waiting';
       await controller.reload();
       await tester.pumpAndSettle();
-      expect(find.text('Copy setup message'), findsOneWidget);
+      expect(find.text('Copy pairing + Gmail skill'), findsOneWidget);
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await tester.tap(find.text('Copy pairing + Gmail skill'));
+      await tester.pumpAndSettle();
+      expect(copied, contains(exchange.setupLine));
+      expect(copied, contains('SKILL: Agent Gateway Gmail'));
+      expect(copied, contains('RELAY_URL: https://relay.example.com'));
+      expect(
+        find.textContaining('Copied. Paste into your trusted'),
+        findsOneWidget,
+      );
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
@@ -88,7 +114,7 @@ void main() {
       );
       await tester.tap(find.text('Cancel pairing'));
       await tester.pumpAndSettle();
-      expect(find.text('Copy setup message'), findsNothing);
+      expect(find.text('Copy pairing + Gmail skill'), findsNothing);
       expect(controller.pinPairing, isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     },

@@ -11,7 +11,10 @@ hostname, callback service, or always-on PC is required.
    needs the `PAIRINGS` binding, `v2-pairing` migration, and exact `RELAY_ORIGIN`.
    Pairing does not require APNs, Gmail, or the notification transport pins.
 2. On an unpaired iPhone, tap **Pair with Muse**. Keep the app open.
-3. Tap **Copy setup message** and paste it into your trusted Muse conversation.
+3. Tap **Copy pairing + Gmail skill** and paste it into your trusted Muse conversation.
+   One message includes the setup line and a reusable Gmail SKILL bound to this
+   app's relay origin. Return to Agent Gateway to confirm the pairing. Muse is
+   instructed to discard the temporary setup line rather than save it in its skill.
    This message contains the temporary secret code. Do not post it publicly.
 4. Inside Muse's existing runtime, with the existing private
    `GATEWAY_AGENT_STATE` selected, stop any MCP/CLI process using that same state
@@ -44,7 +47,10 @@ Update `PAIRING_CONFIG` using the CLI's returned `transportConfiguration` (or
 `transport-config`). This remains necessary after every re-pair because the epoch
 changes. The relay never accepts unauthenticated public-key registration.
 Then enable **Relay notifications** on the phone, grant notification permission,
-and convey the sealed delivery route to Muse. See [relay setup](remote-delivery.md).
+and paste the automatically copied **Gmail skill + route** message into Muse.
+Already paired users can tap **Copy Gmail skill** without re-pairing; expired routes
+are omitted. **Refresh and copy Gmail skill + route** refreshes and copies in one
+action. See [relay setup](remote-delivery.md).
 Route refresh/distribution remains a separate step. Pairing itself sends no push.
 
 ## Recovery

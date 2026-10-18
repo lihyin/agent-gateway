@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../approvals/review_service.dart';
 import '../domain/gateway_configuration.dart';
+import '../domain/muse_skill.dart';
 import 'gateway_controller.dart';
 
 class GatewayHome extends StatefulWidget {
@@ -28,6 +29,25 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
   Timer? _expiry;
   Completer<void>? _resumed;
   bool _sensitive = false, _obscured = false;
+  Future<void> _copyMuseMessage(String message) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: message));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Copied. Paste into your trusted Meta Muse chat, then return here.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not copy. Please try again.')),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -218,16 +238,16 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
               style: Theme.of(context).textTheme.headlineLarge,
             ),
             const Text(
-              'Copy the setup message to your trusted Muse chat. Keep this app open. The code expires in five minutes and allows one attempt.',
+              'Copy one message with your pairing code and Gmail skill. Paste it into your trusted Meta Muse chat, then return here to confirm. The code expires in five minutes and allows one attempt.',
             ),
             TextButton(
-              onPressed: () => Clipboard.setData(
-                ClipboardData(
-                  text:
-                      'Pair this Muse runtime with my Agent Gateway iPhone. Run the Agent Gateway CLI pair command and provide this setup line on standard input. Keep the code private.\n${pairing.exchange.setupLine}',
+              onPressed: () => _copyMuseMessage(
+                musePairingMessage(
+                  origin: pairing.exchange.origin,
+                  setupLine: pairing.exchange.setupLine,
                 ),
               ),
-              child: const Text('Copy setup message'),
+              child: const Text('Copy pairing + Gmail skill'),
             ),
           ],
           Text(switch (pairing.status) {
@@ -466,6 +486,17 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                         ),
                       ] else ...[
                         if (c.pinPairing != null) _pinPairing(c),
+                        if (c.museSkill != null) ...[
+                          const Text(
+                            'Paste the Gmail skill into Meta Muse to teach it how to request email through your paired relay. Enable notifications below to include the delivery route.',
+                          ),
+                          FilledButton.tonal(
+                            onPressed: c.busy
+                                ? null
+                                : () => _copyMuseMessage(c.museSkill!),
+                            child: const Text('Copy Gmail skill'),
+                          ),
+                        ],
                         if (c.relay != null)
                           SwitchListTile(
                             title: const Text('Relay notifications'),
@@ -473,13 +504,30 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                               'Notifications never grant Gmail access. Open the app to review; approved results return through the relay to Muse.',
                             ),
                             value: c.relayEnabled,
-                            onChanged: c.busy ? null : c.enableRelay,
+                            onChanged: c.busy
+                                ? null
+                                : (enabled) async {
+                                    await c.enableRelay(enabled);
+                                    if (enabled &&
+                                        c.error == null &&
+                                        c.museSkill != null) {
+                                      await _copyMuseMessage(c.museSkill!);
+                                    }
+                                  },
                           ),
                         if (c.relayEnabled)
                           TextButton(
-                            onPressed: c.busy ? null : c.refreshRelayRoute,
+                            onPressed: c.busy
+                                ? null
+                                : () async {
+                                    await c.refreshRelayRoute();
+                                    if (c.error == null &&
+                                        c.museSkill != null) {
+                                      await _copyMuseMessage(c.museSkill!);
+                                    }
+                                  },
                             child: const Text(
-                              'Refresh and copy Muse delivery route',
+                              'Refresh and copy Gmail skill + route',
                             ),
                           ),
                         Text(

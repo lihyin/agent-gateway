@@ -74,10 +74,11 @@ profiles are provider setup blockers, not something an unsigned test can establi
 
 Install the new app, connect Gmail and complete pairing. Enable **Relay
 notifications** and confirm locally, then accept iOS notification permission. The
-phone registers its current APNs token and displays an opaque delivery route in
-the copyable transfer field. Transfer only that route to the Muse-side client.
-Use **Refresh and copy Muse delivery route** after token changes, app restoration,
-or the 24-hour route expiry. Give the refreshed route to Muse. Automatic delivery
+phone registers its current APNs token and copies one Gmail SKILL message with
+the relay origin and sealed route. Paste it into your trusted Muse conversation.
+The raw route remains available in the advanced transfer field for existing clients.
+Use **Refresh and copy Gmail skill + route** after token changes, app restoration,
+or the 24-hour route expiry. Paste the refreshed message into Muse. Automatic delivery
 of route replacements to Muse is not implemented.
 
 ## 4. Request, review and return
