@@ -50,3 +50,19 @@ class_name = "PairingChannel"
 [[env.production.durable_objects.bindings]]
 name = "PAIRINGS"
 class_name = "PairingChannel"
+
+[[migrations]]
+tag = "v3-pairing-registry"
+new_sqlite_classes = ["PairingRegistry"]
+
+[[env.local.durable_objects.bindings]]
+name = "PAIRINGS_REGISTRY"
+class_name = "PairingRegistry"
+
+[[env.staging.durable_objects.bindings]]
+name = "PAIRINGS_REGISTRY"
+class_name = "PairingRegistry"
+
+[[env.production.durable_objects.bindings]]
+name = "PAIRINGS_REGISTRY"
+class_name = "PairingRegistry"
