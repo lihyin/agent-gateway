@@ -1,11 +1,13 @@
 import type {
   DurableObjectNamespace,
+  DurableObjectState,
   WebSocket as Socket,
 } from "@cloudflare/workers-types";
 import { publicOrigin } from "./foreground.js";
+import { selfRegisterPair, type RegistryEnvironment } from "./registry.js";
 
 declare const WebSocketPair: { new (): { 0: Socket; 1: Socket } };
-export interface PairingEnvironment {
+export interface PairingEnvironment extends RegistryEnvironment {
   PAIRINGS?: DurableObjectNamespace;
   RELAY_ORIGIN?: string;
 }
@@ -41,6 +43,10 @@ export async function pairingFetch(
 // A single live attempt, never a mailbox. No storage, hibernation or payload attachments.
 // Object resets invalidate the session; the phone must generate a new random address/code.
 export class PairingChannel {
+  constructor(
+    private readonly ctx: DurableObjectState,
+    private readonly env: PairingEnvironment,
+  ) {}
   private device?: Socket;
   private agent?: Socket;
   private used = false;
@@ -82,6 +88,41 @@ export class PairingChannel {
       ) {
         this.close();
         return;
+      }
+      // Self-registration (see registry.ts): the phone may send one
+      // cleartext pairing_record frame presenting its pair record with a
+      // device-signed proof. The relay consumes the frame — it is never
+      // forwarded to the agent — and stores the record in the
+      // PairingRegistry, so no operator step follows a pairing. Without a
+      // registry bound the frame is ignored (PAIRING_CONFIG deployments
+      // are unaffected); an invalid proof with a registry bound fails the
+      // session closed, like any other protocol violation. The frame
+      // counts toward the existing per-socket frame bound (the phone
+      // sends at most challenge, ready, receipt, pairing_record).
+      if (role === "/device") {
+        let frame: { kind?: unknown } | undefined;
+        try {
+          frame = JSON.parse(data) as { kind?: unknown };
+        } catch {
+          frame = undefined;
+        }
+        if (frame?.kind === "pairing_record") {
+          if (this.env.PAIRINGS_REGISTRY) {
+            const registration = (async () => {
+              try {
+                await selfRegisterPair(
+                  this.env,
+                  frame,
+                  publicOrigin(this.env.RELAY_ORIGIN ?? ""),
+                );
+              } catch {
+                this.close();
+              }
+            })();
+            this.ctx.waitUntil(registration);
+          }
+          return;
+        }
       }
       const peer = role === "/device" ? this.agent : this.device;
       if (!peer) {

@@ -361,6 +361,20 @@ class PinPairing {
           }),
         }),
       );
+      // Self-registration: present the pair record to the relay's
+      // PairingRegistry with a device-signed proof, so the relay stores
+      // the record at pairing time and needs no per-user PAIRING_CONFIG
+      // step. Sent after the receipt and best-effort on purpose: a relay
+      // without a registry ignores the frame, and a registration failure
+      // must never fail an otherwise valid pairing.
+      try {
+        _socket!.add(
+          jsonEncode(await delivery.pairRegistration(exchange.origin)),
+        );
+      } catch (_) {
+        // Pairing continues; the relay falls back to PAIRING_CONFIG or
+        // operator provisioning for this pair.
+      }
     } else if (status == 'finishing') {
       exactKeys(frame, {'jwe'});
       await exchange.open(frame['jwe'] as String, 'complete');

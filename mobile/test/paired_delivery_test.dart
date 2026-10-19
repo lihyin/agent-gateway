@@ -120,6 +120,43 @@ void main() {
       await expectLater(pair(), throwsA(anything));
     },
   );
+  test('pair registration frame carries the pair record with a device-signed proof', () async {
+    const origin = 'https://relay.example.com';
+    await expectLater(delivery.pairRegistration(origin), throwsA(anything));
+    await pair();
+    final frame = await delivery.pairRegistration(origin);
+    expect(frame.keys.toSet(), {'kind', 'record', 'proof'});
+    expect(frame['kind'], 'pairing_record');
+    final record = Map<String, dynamic>.from(frame['record']);
+    expect(record.keys.toSet(), {
+      'deviceSigningKey',
+      'agentSigningKey',
+      'deviceId',
+      'agentId',
+      'pairingEpoch',
+    });
+    expect(record['deviceId'], identityId(device));
+    expect(record['agentId'], identityId(agent));
+    expect(record['pairingEpoch'], delivery.epoch(identityId(agent)));
+    expect(record['deviceSigningKey'], publicIdentity(device)['signing']);
+    expect(record['agentSigningKey'], publicIdentity(agent)['signing']);
+    final proof = await verifyObject(
+      Map<String, dynamic>.from(record['deviceSigningKey']),
+      frame['proof'],
+      'agw+pair-register',
+    );
+    expect(proof, {
+      'version': 1,
+      'audience': origin,
+      'deviceId': record['deviceId'],
+      'agentId': record['agentId'],
+      'pairingEpoch': record['pairingEpoch'],
+      'issuedAt': 100,
+      'expiresAt': 130,
+    });
+    await delivery.unpair();
+    await expectLater(delivery.pairRegistration(origin), throwsA(anything));
+  });
   test('cancelled pairing cannot commit after local authentication', () async {
     await expectLater(
       delivery.pair(f['offer'], f['fingerprint'], stillAuthorized: () => false),

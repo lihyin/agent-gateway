@@ -210,6 +210,42 @@ class PairedDelivery {
         await _save('transport.relay', value);
         _relay = value;
       });
+  // Self-registration frame for the relay's PairingRegistry: the pair
+  // record (public transport configuration) plus a device-signed proof
+  // (typ agw+pair-register) binding the record's IDs and epoch to this
+  // device. Sent on the pairing socket right after the pairing receipt
+  // (see PinPairing), so the relay stores the record at pairing time and
+  // no per-user PAIRING_CONFIG step is needed on the relay.
+  Future<Map<String, dynamic>> pairRegistration(String origin) =>
+      _serial.run(() async {
+        _check();
+        if (_pair == null) throw const GatewayError('unpaired');
+        final now = clock().millisecondsSinceEpoch ~/ 1000;
+        final record = {
+          'deviceSigningKey': Map<String, dynamic>.from(
+            publicIdentity(_identity!)['signing'],
+          ),
+          'agentSigningKey': Map<String, dynamic>.from(
+            _pair!['identity']['signing'],
+          ),
+          'deviceId': identityId(_identity!),
+          'agentId': _pair!['agentId'],
+          'pairingEpoch': _pair!['epoch'],
+        };
+        return {
+          'kind': 'pairing_record',
+          'record': record,
+          'proof': signObject(_identity!, {
+            'version': 1,
+            'audience': origin,
+            'deviceId': record['deviceId'],
+            'agentId': record['agentId'],
+            'pairingEpoch': record['pairingEpoch'],
+            'issuedAt': now,
+            'expiresAt': now + 30,
+          }, 'agw+pair-register'),
+        };
+      });
   Future<String> registrationProof(String origin, String pushToken) =>
       _serial.run(() async {
         _check();
