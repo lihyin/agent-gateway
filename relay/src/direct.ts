@@ -195,7 +195,8 @@ function registerHint(compact: string): PairHint {
   try {
     const payload = decodeJwt(compact);
     return {
-      agentId: typeof payload.agentId === "string" ? payload.agentId : undefined,
+      agentId:
+        typeof payload.agentId === "string" ? payload.agentId : undefined,
       deviceId:
         typeof payload.deviceId === "string" ? payload.deviceId : undefined,
     };

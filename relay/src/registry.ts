@@ -74,7 +74,10 @@ export class PairingRegistry {
     }
     if (url.pathname === "/pair" && request.method === "DELETE") {
       const agentId = url.searchParams.get("agentId") ?? "";
-      this.ctx.storage.sql.exec(`DELETE FROM pairs WHERE agent_id = ?`, agentId);
+      this.ctx.storage.sql.exec(
+        `DELETE FROM pairs WHERE agent_id = ?`,
+        agentId,
+      );
       return Response.json({ status: "deleted" });
     }
     return Response.json({ error: "not_found" }, { status: 404 });
@@ -83,7 +86,9 @@ export class PairingRegistry {
 
 function registryStub(env: RegistryEnvironment) {
   if (!env.PAIRINGS_REGISTRY) return undefined;
-  return env.PAIRINGS_REGISTRY.get(env.PAIRINGS_REGISTRY.idFromName(REGISTRY_NAME));
+  return env.PAIRINGS_REGISTRY.get(
+    env.PAIRINGS_REGISTRY.idFromName(REGISTRY_NAME),
+  );
 }
 
 // Look up a pair record by unverified hint IDs taken from the request token.
@@ -117,13 +122,18 @@ export async function provisioningFetch(
   const stub = registryStub(env);
   if (!stub || !env.PROVISIONING_SECRET)
     return Response.json({ error: "not_found" }, { status: 404, headers });
-  if (request.headers.get("Authorization") !== `Bearer ${env.PROVISIONING_SECRET}`)
+  if (
+    request.headers.get("Authorization") !== `Bearer ${env.PROVISIONING_SECRET}`
+  )
     return Response.json({ error: "unauthorized" }, { status: 401, headers });
   let pair: Pair;
   try {
     pair = await validatePairRecord(await request.json());
   } catch {
-    return Response.json({ error: "invalid_request" }, { status: 400, headers });
+    return Response.json(
+      { error: "invalid_request" },
+      { status: 400, headers },
+    );
   }
   const stored = await stub.fetch("https://registry/pair", {
     method: "PUT",

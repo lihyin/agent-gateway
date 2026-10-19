@@ -23,7 +23,7 @@ pattern as `RequestChannel`/`PairingChannel`).
 - **Schema**: `pairs(agent_id PRIMARY KEY, device_id UNIQUE, record, updated_at)`,
   one global instance (`idFromName("global")`).
 - **Lookup**: request/result/registration tokens carry their claimed IDs.
-  The relay reads those IDs from the *unverified* token purely as a lookup
+  The relay reads those IDs from the _unverified_ token purely as a lookup
   hint (`decodeJwt`), loads the matching record, validates it
   (`validatePairRecord`: exact keys + JWK thumbprints match the IDs), then
   verifies the token signature against the record's keys and runs every
