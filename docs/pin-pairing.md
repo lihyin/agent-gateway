@@ -35,10 +35,15 @@ hostname, callback service, or always-on PC is required.
 6. The phone reports that both endpoints are paired after Muse verifies and saves
    the receipt. The CLI returns `status: paired` plus public transport configuration.
 
-The code expires after at most five minutes and permits one attempt. There is no
+The code expires after at most thirty minutes and permits one attempt. There is no
 numeric-code lookup: the setup line carries a random session address as well as
 the code. This avoids exposing the authentication code to the relay. You do not
 copy fingerprints, signed offers, or receipts during this flow.
+
+The thirty-minute window requires matching updated phone, Muse client and relay
+versions. Older Muse clients reject setup lines more than five minutes from expiry;
+older relays close pairing sockets after five minutes. Gmail requests and disclosure
+approvals still expire within five minutes; only the code-pairing window changed.
 
 ## Enable notification delivery separately
 
@@ -110,7 +115,7 @@ different session, expired exchanges and invalid signatures fail closed.
 Relay endpoints are `GET /v1/pairing/<session>/device` and `/agent`, WebSocket
 upgrades only. Origin headers and query parameters are rejected. One live phone,
 one joining agent, at most five frames per peer, 8192 UTF-8 bytes per frame, and
-five-minute relay timers bound resources. The phone additionally enforces exactly
+thirty-minute relay timers bound resources. The phone additionally enforces exactly
 the expected sequence and one authentication attempt, even against a malicious
 relay. A relay reset loses the room, never recreates endpoint secrets.
 

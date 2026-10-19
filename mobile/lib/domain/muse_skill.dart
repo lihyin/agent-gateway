@@ -28,7 +28,7 @@ String musePairingMessage({
     '''
 Pair this Meta Muse runtime with my Agent Gateway iPhone, then retain the Gmail SKILL below for my future email requests.
 Run node agent-adapter/dist/src/cli.js pair after the runtime setup below. Supply ONLY the AGW1 line below on standard input followed by a newline. Keep the process running while I return to Agent Gateway to confirm and authenticate.
-The setup line contains a private, single-use code that expires in five minutes. Never put it in command arguments, environment variables, shell history, logs or a saved skill. Discard it after pairing. If expired, ask me for a fresh setup message. Preserve existing agent identity/state.
+The setup line contains a private, single-use code that expires in thirty minutes. Never put it in command arguments, environment variables, shell history, logs or a saved skill. Discard it after pairing. If expired, ask me for a fresh setup message. Preserve existing agent identity/state.
 
 $setupLine
 

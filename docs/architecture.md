@@ -38,7 +38,7 @@ state inside Muse's runtime.
 ## Authentication and routing
 
 The phone and Muse-side client generate separate signing and encryption keys and
-complete [one-time-code pairing](pin-pairing.md), with full-fingerprint comparison as an advanced fallback. A separate live PairingChannel inside the same relay forwards public SRP values and encrypted signed offers/receipts for at most five minutes, without storage, payload attachments, or endpoint secrets. Resets require a fresh code. The operator pins both public signing keys, IDs
+complete [one-time-code pairing](pin-pairing.md), with full-fingerprint comparison as an advanced fallback. A separate live PairingChannel inside the same relay forwards public SRP values and encrypted signed offers/receipts for at most thirty minutes, without storage, payload attachments, or endpoint secrets. Resets require a fresh code. The operator pins both public signing keys, IDs
 and the epoch in the relay's `PAIRING_CONFIG`. This implementation supports one
 configured pairing per relay deployment. Private keys stay at the endpoints.
 

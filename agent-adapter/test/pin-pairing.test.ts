@@ -25,7 +25,7 @@ const setup = {
   origin: "https://relay.example.com",
   session: "a".repeat(64),
   code: "00123456",
-  expiresAt: Math.floor(Date.now() / 1000) + 300,
+  expiresAt: Math.floor(Date.now() / 1000) + 1800,
 };
 const line = (value: unknown) =>
   `AGW1.${Buffer.from(JSON.stringify(value)).toString("base64url")}`;
@@ -43,6 +43,20 @@ test("setup validates origin, session entropy, code, expiry and fields", () => {
   ]) {
     assert.throws(() => parsePairingSetup(line({ ...setup, ...patch })));
   }
+});
+
+test("pairing accepts the thirty-minute boundary and rejects longer or expired codes", () => {
+  const now = 1700000000;
+  const boundary = { ...setup, expiresAt: now + 1800 };
+  assert.deepEqual(parsePairingSetup(line(boundary), now), boundary);
+  assert.throws(() =>
+    parsePairingSetup(line({ ...boundary, expiresAt: now + 1801 }), now),
+  );
+  assert.throws(() => parsePairingSetup(line(boundary), boundary.expiresAt));
+  assert.deepEqual(
+    parsePairingSetup(line({ ...setup, expiresAt: now + 300 }), now),
+    { ...setup, expiresAt: now + 300 },
+  );
 });
 
 test(

@@ -19,7 +19,7 @@ encrypted results and cannot repeat source access.
 
 ## One-time-code pairing
 
-The default [pairing flow](pin-pairing.md) uses a five-minute, single-attempt
+The default [pairing flow](pin-pairing.md) uses a thirty-minute, single-attempt
 eight-digit PIN with library SRP-6a, followed by role/session/origin/expiry-bound
 JOSE records carrying the existing signed offer and receipt. Device confirmation
 and local authentication precede pinning. A random session address, separate from
@@ -29,7 +29,7 @@ the PIN, verifier, shared key or private endpoint keys. Manual full-fingerprint
 comparison remains an advanced fallback.
 
 `PairingChannel` adds bounded live forwarding inside the existing relay, with
-two sockets, at most five 8192-byte frames per peer and a five-minute timer.
+two sockets, at most five 8192-byte frames per peer and a thirty-minute timer.
 No Storage API, hibernation attachment or durable pairing mailbox is used. The
 phone independently enforces one proof/sequence/expiry against a malicious relay.
 Resets and disconnects need a fresh code; interrupted final handoff may require

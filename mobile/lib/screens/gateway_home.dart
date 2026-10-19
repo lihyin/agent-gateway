@@ -238,7 +238,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
               style: Theme.of(context).textTheme.headlineLarge,
             ),
             const Text(
-              'Copy one message with your pairing code and Gmail skill. Paste it into your trusted Meta Muse chat, then return here to confirm. The code expires in five minutes and allows one attempt.',
+              'Copy one message with your pairing code and Gmail skill. Paste it into your trusted Meta Muse chat, then return here to confirm. The code expires in thirty minutes and allows one attempt.',
             ),
             TextButton(
               onPressed: () => _copyMuseMessage(

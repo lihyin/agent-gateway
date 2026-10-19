@@ -33,7 +33,7 @@ export function parsePairingSetup(
     !/^[0-9]{8}$/.test(value.code) ||
     !Number.isInteger(value.expiresAt) ||
     value.expiresAt <= now ||
-    value.expiresAt > now + 300
+    value.expiresAt > now + 1800
   )
     throw new Error("invalid_pairing_setup");
   return value;

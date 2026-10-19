@@ -12,6 +12,8 @@ void main() {
     expect(message, contains('SKILL: Agent Gateway Gmail (v1)'));
     expect(message, contains('Delivery route: not supplied yet'));
     expect(message, contains('PAIRING_CONFIG'));
+    expect(message, contains('code that expires in thirty minutes'));
+    expect(message, contains('Requests expire after five minutes'));
     expect(message, contains('Pending review is not a successful search'));
   });
   test(

@@ -64,8 +64,8 @@ export class PairingChannel {
     if (role === "/device") {
       this.used = true;
       this.device = pair[1];
-      this.deadline = Date.now() + 300_000;
-      this.timer = setTimeout(() => this.close(), 300_000);
+      this.deadline = Date.now() + 1_800_000;
+      this.timer = setTimeout(() => this.close(), 1_800_000);
     } else {
       this.agent = pair[1];
       this.device!.send(JSON.stringify({ kind: "joined" }));

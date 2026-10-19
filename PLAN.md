@@ -1,7 +1,7 @@
 # Agent Gateway Development Plan
 
 **Pairing revision:** [One-time-code pairing](docs/pin-pairing.md) replaces manual
-offer/receipt copying as the default. A transient five-minute relay room forwards
+offer/receipt copying as the default. A transient thirty-minute relay room forwards
 library SRP-6a and encrypted signed pairing material; phone confirmation remains
 required. Full-fingerprint pairing is the advanced fallback. No extra server or
 persistent mailbox is introduced. Operator transport pins and notification route

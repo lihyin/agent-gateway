@@ -53,7 +53,10 @@ void main() {
       expect(exchange.session, isNot(other.session));
       expect(exchange.challenge.containsKey('code'), isFalse);
       expect(exchange.challenge.containsKey('verifier'), isFalse);
-      now = now.add(const Duration(minutes: 5));
+      expect(exchange.expiresAt, now.millisecondsSinceEpoch ~/ 1000 + 1800);
+      now = now.add(const Duration(minutes: 29, seconds: 59));
+      exchange.check();
+      now = now.add(const Duration(seconds: 1));
       expect(exchange.check, throwsA(isA<GatewayError>()));
       other.close();
       expect(other.check, throwsA(isA<GatewayError>()));

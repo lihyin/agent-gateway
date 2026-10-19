@@ -20,7 +20,7 @@ node agent-adapter/dist/src/cli.js pair
 ```
 
 Provide the message's `AGW1.…` line on standard input. Approve the pairing on the
-phone and authenticate. The one-time code expires within five minutes, permits
+phone and authenticate. The one-time code expires within thirty minutes, permits
 one attempt and is never sent to the relay. No fingerprint/receipt copying is
 needed. See [code pairing](pin-pairing.md), including interrupted-pair recovery.
 The [manual fallback](paired-delivery.md) remains available. No source credentials

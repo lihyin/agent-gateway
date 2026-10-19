@@ -79,7 +79,7 @@ class PinExchange {
     }
     code = Random.secure().nextInt(100000000).toString().padLeft(8, '0');
     session = _hex(_randomBytes(32));
-    expiresAt = this.clock().millisecondsSinceEpoch ~/ 1000 + 300;
+    expiresAt = this.clock().millisecondsSinceEpoch ~/ 1000 + 1800;
     final group = SRP6StandardGroups.rfc5054_2048;
     final salt = _randomBytes(32);
     final verifier = SRP6VerifierGenerator(group: group, digest: SHA256Digest())

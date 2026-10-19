@@ -9,7 +9,7 @@ Pairing adds `GET /v1/pairing/<session>/device` and `/agent`, WebSocket upgrades
 only. The session is 64 lowercase hex characters from 32 random bytes, distinct
 from the secret PIN. These paths require `PAIRINGS` and `RELAY_ORIGIN`, but do not
 require or modify `PAIRING_CONFIG`. One phone and one agent exchange public SRP
-values and encrypted signed offers/receipts for at most five minutes. Endpoints,
+values and encrypted signed offers/receipts for at most thirty minutes. Endpoints,
 not the relay, authenticate the code and approve pairing. See the full
 [PIN protocol](pin-pairing.md). Invalid upgrades/Origin/query return 400;
 missing/used rooms or duplicate peers return 409; disabled/malformed paths return 404. Excess frames, binary/oversize frames, disconnect or expiry close both
