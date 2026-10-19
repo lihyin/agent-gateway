@@ -6,10 +6,7 @@ import { Miniflare } from "miniflare";
 import { Bridge } from "../../agent-adapter/src/bridge.js";
 import { signObject, publicIdentity } from "../../agent-adapter/src/crypto.js";
 import type { Pair } from "../src/direct.js";
-import {
-  registryPair,
-  type RegistryEnvironment,
-} from "../src/registry.js";
+import { registryPair, type RegistryEnvironment } from "../src/registry.js";
 
 const f = JSON.parse(
   readFileSync(
@@ -101,9 +98,8 @@ test(
         "none",
       );
       const env = {
-        PAIRINGS_REGISTRY: await mf.getDurableObjectNamespace(
-          "PAIRINGS_REGISTRY",
-        ),
+        PAIRINGS_REGISTRY:
+          await mf.getDurableObjectNamespace("PAIRINGS_REGISTRY"),
       } as unknown as RegistryEnvironment;
       let stored: unknown;
       for (let attempt = 0; attempt < 50 && !stored; attempt++) {
@@ -136,7 +132,10 @@ test(
           setTimeout(() => reject(new Error("session did not close")), 5000),
         ),
       ]);
-      assert.deepEqual(await registryPair(env, { agentId: record.agentId }), record);
+      assert.deepEqual(
+        await registryPair(env, { agentId: record.agentId }),
+        record,
+      );
     } finally {
       await mf.dispose();
     }

@@ -50,7 +50,7 @@ pairing** — no standing operator action, no secret edit, no redeploy:
   where `record` is its transportConfiguration and `proof` is an ES256
   JWS (typ `agw+pair-register`) signed with the **device** signing key,
   over exactly `{ version, audience, deviceId, agentId, pairingEpoch,
-  issuedAt, expiresAt }` (window ≤ 300s; `issuedAt` may lead the relay
+issuedAt, expiresAt }` (window ≤ 300s; `issuedAt` may lead the relay
   clock by up to 30s, the same peer clock-skew allowance the agent
   applies to pairing receipts).
 - The `PairingChannel` intercepts the frame: it is consumed by the relay
@@ -67,7 +67,7 @@ pairing** — no standing operator action, no secret edit, no redeploy:
   trust root of a pairing. Registering a rogue agent against someone
   else's deviceId would require that device's private key, because the
   proof key is bound to the claimed deviceId by thumbprint. Registering
-  your *own* pair is the intended multi-user flow, so no operator secret
+  your _own_ pair is the intended multi-user flow, so no operator secret
   is involved. A record signed by the same device key replaces that
   device's previous record, so a re-pair (new agent and/or new epoch)
   supersedes the old row atomically.
