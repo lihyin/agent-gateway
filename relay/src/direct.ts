@@ -2,6 +2,7 @@ import {
   CompactEncrypt,
   compactDecrypt,
   compactVerify,
+  decodeJwt,
   importJWK,
   calculateJwkThumbprint,
   importPKCS8,
@@ -10,8 +11,9 @@ import {
 } from "jose";
 import type { DurableObjectNamespace } from "@cloudflare/workers-types";
 import { boundedText, publicOrigin } from "./foreground.js";
+import { registryPair, type RegistryEnvironment } from "./registry.js";
 
-export interface DirectEnvironment {
+export interface DirectEnvironment extends RegistryEnvironment {
   RELAY_ORIGIN?: string;
   PAIRING_CONFIG?: string;
   RELAY_ROUTING_KEY?: string;
@@ -33,13 +35,14 @@ export type Context = {
   expiresAt: number;
 };
 export type Envelope = { context: Context; jwe: string };
-type Pair = {
+export type Pair = {
   deviceSigningKey: JWK;
   agentSigningKey: JWK;
   deviceId: string;
   agentId: string;
   pairingEpoch: string;
 };
+export type PairHint = { agentId?: string; deviceId?: string };
 type Route = {
   version: 1;
   audience: string;
@@ -63,18 +66,18 @@ export function exact(
   )
     throw new Error("unauthorized");
 }
-export async function configuration(
-  env: DirectEnvironment,
-): Promise<{ pair: Pair; origin: string; key: Uint8Array }> {
-  const origin = publicOrigin(env.RELAY_ORIGIN ?? "");
-  const pair = JSON.parse(env.PAIRING_CONFIG ?? "null") as Pair;
-  exact(pair, [
+// Validate a pair record (the public transportConfiguration shape) from any
+// source: the PAIRING_CONFIG secret, the PairingRegistry, or a provisioning
+// request. Key thumbprints must match the claimed IDs.
+export async function validatePairRecord(value: unknown): Promise<Pair> {
+  exact(value, [
     "deviceSigningKey",
     "agentSigningKey",
     "deviceId",
     "agentId",
     "pairingEpoch",
   ]);
+  const pair = value as Pair;
   for (const [key, id] of [
     [pair.deviceSigningKey, pair.deviceId],
     [pair.agentSigningKey, pair.agentId],
@@ -87,6 +90,22 @@ export async function configuration(
     )
       throw new Error("configuration_required");
   }
+  return pair;
+}
+
+export async function configuration(
+  env: DirectEnvironment,
+  hint: PairHint = {},
+): Promise<{ pair: Pair; origin: string; key: Uint8Array }> {
+  const origin = publicOrigin(env.RELAY_ORIGIN ?? "");
+  // Multi-pair path: when a registry is bound, the caller supplies the
+  // token's claimed IDs as a lookup hint; the record found is validated and
+  // the token signature is still verified against it by the caller.
+  // Single-pair fallback: PAIRING_CONFIG keeps existing deployments working.
+  const fromRegistry = await registryPair(env, hint);
+  const pair = await validatePairRecord(
+    fromRegistry ?? JSON.parse(env.PAIRING_CONFIG ?? "null"),
+  );
   if (!/^[A-Za-z0-9_-]{43}$/.test(env.RELAY_ROUTING_KEY ?? ""))
     throw new Error("configuration_required");
   const key = Uint8Array.from(
@@ -169,12 +188,41 @@ export function envelope(
     throw new Error("oversize");
   return value as unknown as Envelope;
 }
+// Lookup hints are read from the UNVERIFIED token. They only choose which
+// pair record to load; proof() then verifies the signature against that
+// record's keys and every existing equality check still runs.
+function registerHint(compact: string): PairHint {
+  try {
+    const payload = decodeJwt(compact);
+    return {
+      agentId: typeof payload.agentId === "string" ? payload.agentId : undefined,
+      deviceId:
+        typeof payload.deviceId === "string" ? payload.deviceId : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+function envelopeHint(
+  compact: string,
+  field: "agentId" | "deviceId",
+): PairHint {
+  try {
+    const payload = decodeJwt(compact) as {
+      envelope?: { context?: { sender?: unknown } };
+    };
+    const sender = payload.envelope?.context?.sender;
+    return typeof sender === "string" ? { [field]: sender } : {};
+  } catch {
+    return {};
+  }
+}
 export async function issueRoute(
   compact: string,
   env: DirectEnvironment,
   now = seconds(),
 ) {
-  const { pair, origin, key } = await configuration(env);
+  const { pair, origin, key } = await configuration(env, registerHint(compact));
   const value = await proof(
     compact,
     pair.deviceSigningKey,
@@ -213,7 +261,10 @@ export async function verifyRequest(
   env: DirectEnvironment,
   now = seconds(),
 ) {
-  const { pair, origin, key } = await configuration(env);
+  const { pair, origin, key } = await configuration(
+    env,
+    envelopeHint(compact, "agentId"),
+  );
   const value = await proof(
     compact,
     pair.agentSigningKey,
@@ -268,7 +319,10 @@ export async function verifyResult(
   env: DirectEnvironment,
   now = seconds(),
 ) {
-  const { pair, origin } = await configuration(env);
+  const { pair, origin } = await configuration(
+    env,
+    envelopeHint(compact, "deviceId"),
+  );
   const value = await proof(
     compact,
     pair.deviceSigningKey,
@@ -338,7 +392,7 @@ export async function directFetch(
   const url = new URL(request.url);
   if (
     !env.RELAY_ORIGIN ||
-    !env.PAIRING_CONFIG ||
+    (!env.PAIRING_CONFIG && !env.PAIRINGS_REGISTRY) ||
     !env.RELAY_ROUTING_KEY ||
     !env.CHANNELS
   )
