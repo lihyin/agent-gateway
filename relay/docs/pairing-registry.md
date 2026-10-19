@@ -92,10 +92,13 @@ remain possible in an emergency and need no code path.
 
 ## Known sketch-level gaps
 
-- No shipping client sends `pairing_record` yet: the iOS app follow-up is
-  to emit the frame (record + device-signed proof) right after sending the
-  pairing receipt. The agent needs no change. Until clients ship it,
-  production still relies on `PAIRING_CONFIG` / endpoint provisioning.
+- Client support has landed in the app (same branch): `PinPairing` sends
+  the `pairing_record` frame right after the pairing receipt, built by
+  `PairedDelivery.pairRegistration` (record + device-signed proof), and
+  treats registration as best-effort so it can never fail a pairing. The
+  agent needs no change. Nothing is deployed yet, though: until the relay
+  and app changes ship, production still relies on `PAIRING_CONFIG` /
+  endpoint provisioning.
 - Self-registration is intentionally permissionless for valid pairs (any
   completed pairing may register). If open sign-up ever needs gating,
   layer an account/invite check at registration time rather than
