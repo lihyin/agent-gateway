@@ -140,7 +140,10 @@ export class Bridge {
         verified.expiresAt !== offer.expiresAt ||
         typeof verified.issuedAt !== "number" ||
         !Number.isInteger(verified.issuedAt) ||
-        verified.issuedAt > this.clock() ||
+        // Local runtime patch (2026-10-18): allow up to 30s of peer clock skew.
+        // This runtime's clock lags the iPhone's by ~1-2s, and the original
+        // zero-tolerance check rejected otherwise valid pairing receipts.
+        verified.issuedAt > this.clock() + 30 ||
         verified.issuedAt < (offer.issuedAt as number) ||
         (verified.expiresAt as number) <= this.clock()
       )
@@ -157,7 +160,9 @@ export class Bridge {
           issuedAt: verified.issuedAt,
           expiresAt: verified.expiresAt,
         },
-        this.clock(),
+        // Same local clock-skew allowance as above, applied only to this
+        // pairing-acceptance validation (protocol.ts itself is unchanged).
+        this.clock() + 30,
       );
       await importJWK(identity.signing, "ES256");
       await importJWK(identity.encryption, "RSA-OAEP-256");
