@@ -10,6 +10,10 @@
 只发布 production 和 TestFlight 时，将手动运行表单的 **deploy_staging** 关闭。
 此时不检查或部署 staging，只要求 production 的推送配置齐全。
 
+若中继已部署，只需更新 iPhone App，可运行 **Publish iOS TestFlight**。
+该流程不修改 staging 或 production 中继；它会报告 production 配置问题，但不因此
+阻止构建分发。App 安装成功与 APNs 通知可用是两个独立的验收结果。
+
 1. verify：Node、Flutter 和 Docker 检查。
 2. Check relay transport secrets before deployment：staging 和 production 配置名称齐全。
 3. staging、production 部署和健康/配对通道验证。
@@ -41,7 +45,9 @@
 ### Cloudflare 两个 Worker
 
 位置：Workers & Pages → 对应 Worker → Settings → Variables and Secrets。
-分别检查 staging 和 production；这里的六项使用 Secret 类型。
+分别检查实际使用的环境。`RELAY_ROUTING_KEY` 和 `APNS_PRIVATE_KEY` 必须使用
+Secret 类型；其余四项是公共配置，使用普通 Variable 或 Secret 均可。
+Wrangler 的 `keep_vars` 已开启，防止部署清除控制台配置的普通变量。
 
 | 名称              | 配置                                                                                  |
 | ----------------- | ------------------------------------------------------------------------------------- |

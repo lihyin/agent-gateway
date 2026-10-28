@@ -8,6 +8,7 @@ for (const path of [
   ".github/workflows/release.yml",
   ".github/workflows/relay-recovery.yml",
   ".github/workflows/codemagic-inspect.yml",
+  ".github/workflows/testflight.yml",
 ]) {
   const document = parseDocument(readFileSync(path, "utf8"));
   if (document.errors.length)
