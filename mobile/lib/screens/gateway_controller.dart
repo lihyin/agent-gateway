@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../approvals/local_confirmation.dart';
@@ -102,11 +104,24 @@ class GatewayController extends ChangeNotifier {
       .toList(growable: false);
   List<Map<String, dynamic>> rules = [];
   bool _disposed = false;
-  Future<void> _run(Future<void> Function() task) async {
-    if (busy) return;
-    busy = true;
+  Completer<void>? _operation;
+  Future<void> _run(
+    Future<void> Function() task, {
+    bool background = false,
+  }) async {
+    if (_disposed) return;
+    final active = _operation;
+    if (active != null) {
+      if (background || busy) return;
+      // A user action waits for an in-flight sync rather than being dropped.
+      await active.future;
+      return _run(task);
+    }
+    final operation = Completer<void>();
+    _operation = operation;
+    busy = !background;
     error = null;
-    _notify();
+    if (!background) _notify();
     try {
       await task();
     } on GatewayError catch (e) {
@@ -122,6 +137,8 @@ class GatewayController extends ChangeNotifier {
       error = 'operation_failed';
     } finally {
       busy = false;
+      _operation = null;
+      operation.complete();
       _notify();
     }
   }
@@ -130,14 +147,20 @@ class GatewayController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  Future<void> initialize() => _run(() async {
-    await delivery?.initialize();
-    await review.initialize();
-    connected = await session.isConnected();
-    ready = true;
-    await _reload();
-    await _sync();
-  });
+  Future<void> initialize() async {
+    if (!ready) {
+      await _run(() async {
+        await delivery?.initialize();
+        await review.initialize();
+        connected = await session.isConnected();
+        await _reload();
+        ready = true;
+      });
+    }
+    // Render saved local state immediately; network sync is unobtrusive.
+    if (ready) unawaited(reload());
+  }
+
   Future<void> _reload() async {
     entries = (await review.entries())
         .where(
@@ -162,7 +185,7 @@ class GatewayController extends ChangeNotifier {
   Future<void> reload() => _run(() async {
     await _reload();
     await _sync();
-  });
+  }, background: true);
   Future<void> enableRelay(bool enabled) => _run(() async {
     if (relay == null || delivery == null) {
       throw const GatewayError('relay_configuration_required');

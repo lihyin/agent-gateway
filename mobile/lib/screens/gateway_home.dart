@@ -287,6 +287,48 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
     _ => field,
   };
 
+  String _previewValue(String field, dynamic value) {
+    if (field == 'date' && value is int) {
+      return MaterialLocalizations.of(context).formatShortDate(
+        DateTime.fromMillisecondsSinceEpoch(value * 1000).toLocal(),
+      );
+    }
+    return value.toString();
+  }
+
+  Widget _messagePreview(Map<String, dynamic> message) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          message['subject']?.toString() ?? 'Email',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        if (message['from'] != null || message['date'] != null)
+          Text(
+            [
+              if (message['from'] != null) message['from'].toString(),
+              if (message['date'] != null)
+                _previewValue('date', message['date']),
+            ].join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        if (message['snippet'] != null)
+          Text(
+            message['snippet'].toString(),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+      ],
+    ),
+  );
+
   Widget _entry(ReviewEntry entry, bool busy) {
     if (!entry.request.expiresAt.isAfter(DateTime.now())) {
       return const SizedBox.shrink();
@@ -294,23 +336,26 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
     final dates = MaterialLocalizations.of(context);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               entry.request.purpose,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: 8),
-            Text('Search: ${entry.request.query}'),
+            const SizedBox(height: 4),
             Text(
-              '${dates.formatShortDate(entry.request.since.toLocal())} to ${dates.formatShortDate(entry.request.until.toLocal())}, up to ${entry.request.maxResults} emails',
+              entry.state == ReviewState.disclosure
+                  ? '${entry.candidate.length} ${entry.candidate.length == 1 ? 'email' : 'emails'} to share'
+                  : 'Up to ${entry.request.maxResults} ${entry.request.maxResults == 1 ? 'email' : 'emails'}',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
-            Text(entry.request.fields.map(_fieldLabel).join(', ')),
             if (entry.request.highRisk)
               const Padding(
-                padding: EdgeInsets.only(top: 8),
+                padding: EdgeInsets.only(top: 4),
                 child: Text('Device confirmation required'),
               ),
             if (entry.state == ReviewState.fetching)
@@ -319,10 +364,8 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                 child: LinearProgressIndicator(),
               ),
             if (entry.state == ReviewState.access) ...[
-              const SizedBox(height: 16),
-              const Text(
-                'Allow Gmail access to prepare a preview? Nothing is shared yet.',
-              ),
+              const SizedBox(height: 8),
+              const Text('Preview only. Nothing shared.'),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -331,7 +374,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                     onPressed: busy
                         ? null
                         : () => widget.controller.access(entry, true),
-                    child: const Text('Allow Gmail access'),
+                    child: const Text('Preview'),
                   ),
                   TextButton(
                     onPressed: busy
@@ -343,24 +386,52 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
               ),
             ],
             if (entry.state == ReviewState.disclosure) ...[
-              const SizedBox(height: 16),
-              const Text('Review what Muse will receive.'),
-              for (final message in entry.candidate)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+              for (final message in entry.candidate) _messagePreview(message),
+            ],
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 12),
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              shape: const Border(),
+              collapsedShape: const Border(),
+              title: Text(
+                'Details',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      for (final field in message.entries)
+                      SelectableText(entry.request.purpose),
+                      SelectableText('Search: ${entry.request.query}'),
+                      Text(
+                        '${dates.formatShortDate(entry.request.since.toLocal())} – ${dates.formatShortDate(entry.request.until.toLocal())}',
+                      ),
+                      Text(
+                        'Sharing: ${entry.request.fields.map(_fieldLabel).join(', ')}',
+                      ),
+                      for (final message in entry.candidate)
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: SelectableText(
-                            '${_fieldLabel(field.key)}: ${field.value}',
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (final field in message.entries)
+                                SelectableText(
+                                  '${_fieldLabel(field.key)}: ${_previewValue(field.key, field.value)}',
+                                ),
+                            ],
                           ),
                         ),
                     ],
                   ),
                 ),
+              ],
+            ),
+            if (entry.state == ReviewState.disclosure) ...[
               Wrap(
                 spacing: 8,
                 children: [
@@ -371,7 +442,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                             entry,
                             ReviewAction.allow,
                           ),
-                    child: const Text('Allow once'),
+                    child: const Text('Share once'),
                   ),
                   TextButton(
                     onPressed: busy
