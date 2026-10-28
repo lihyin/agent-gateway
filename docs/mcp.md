@@ -10,9 +10,8 @@ registration first. Install dependencies and build `agent-adapter`. Start
 
 - `GATEWAY_AGENT_STATE`: the private paired agent state file inside Muse's runtime.
 - `RELAY_URL`: exact HTTPS relay origin.
-- `RELAY_ROUTE`: the current sealed delivery route copied from the phone.
 
-Both relay variables are required together. Node 22+ is required. Keep the stdio
+The relay resolves the destination from the verified pairing; no route variable is needed. Node 22+ is required. Keep the stdio
 process alive during review; do not run the operator CLI concurrently on its
 locked state file. Only JSON-RPC goes to stdout, sanitized diagnostics to stderr.
 Source credentials and phone private keys are never accepted.

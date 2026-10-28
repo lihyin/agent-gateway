@@ -100,7 +100,11 @@ import UserNotifications
     if error { callback(FlutterError(code: "notifications_unavailable", message: nil, details: nil)) } else { callback(pushToken) }
   }
   override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-    pushToken = deviceToken.map { String(format: "%02x", $0) }.joined()
+    let newToken = deviceToken.map { String(format: "%02x", $0) }.joined()
+    if pushToken != newToken {
+      pushToken = newToken
+      pushChannel?.invokeMethod("tokenChanged", arguments: nil)
+    }
     finishRegistration(error: false)
     super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
   }

@@ -11,11 +11,17 @@ import {
 } from "jose";
 import type { DurableObjectNamespace } from "@cloudflare/workers-types";
 import { boundedText, publicOrigin } from "./foreground.js";
-import { registryPair, type RegistryEnvironment } from "./registry.js";
+import {
+  registryPair,
+  destinationOperation,
+  deletePair,
+  retiredPair,
+  selfRegisterPair,
+  type RegistryEnvironment,
+} from "./registry.js";
 
 export interface DirectEnvironment extends RegistryEnvironment {
   RELAY_ORIGIN?: string;
-  PAIRING_CONFIG?: string;
   RELAY_ROUTING_KEY?: string;
   APNS_KEY_ID?: string;
   APNS_TEAM_ID?: string;
@@ -43,15 +49,13 @@ export type Pair = {
   pairingEpoch: string;
 };
 export type PairHint = { agentId?: string; deviceId?: string };
-type Route = {
+type Destination = {
   version: 1;
   audience: string;
   deviceId: string;
   agentId: string;
   pairingEpoch: string;
   pushToken: string;
-  issuedAt: number;
-  expiresAt: number;
 };
 export const seconds = () => Math.floor(Date.now() / 1000);
 export function exact(
@@ -67,7 +71,7 @@ export function exact(
     throw new Error("unauthorized");
 }
 // Validate a pair record (the public transportConfiguration shape) from any
-// source: the PAIRING_CONFIG secret, the PairingRegistry, or a provisioning
+// source: PairingRegistry or a device/operator provisioning
 // request. Key thumbprints must match the claimed IDs.
 export async function validatePairRecord(value: unknown): Promise<Pair> {
   exact(value, [
@@ -78,6 +82,11 @@ export async function validatePairRecord(value: unknown): Promise<Pair> {
     "pairingEpoch",
   ]);
   const pair = value as Pair;
+  if (
+    typeof pair.pairingEpoch !== "string" ||
+    !/^[A-Za-z0-9_-]{1,128}$/.test(pair.pairingEpoch)
+  )
+    throw new Error("configuration_required");
   for (const [key, id] of [
     [pair.deviceSigningKey, pair.deviceId],
     [pair.agentSigningKey, pair.agentId],
@@ -98,14 +107,7 @@ export async function configuration(
   hint: PairHint = {},
 ): Promise<{ pair: Pair; origin: string; key: Uint8Array }> {
   const origin = publicOrigin(env.RELAY_ORIGIN ?? "");
-  // Multi-pair path: when a registry is bound, the caller supplies the
-  // token's claimed IDs as a lookup hint; the record found is validated and
-  // the token signature is still verified against it by the caller.
-  // Single-pair fallback: PAIRING_CONFIG keeps existing deployments working.
-  const fromRegistry = await registryPair(env, hint);
-  const pair = await validatePairRecord(
-    fromRegistry ?? JSON.parse(env.PAIRING_CONFIG ?? "null"),
-  );
+  const pair = await validatePairRecord(await registryPair(env, hint));
   if (!/^[A-Za-z0-9_-]{43}$/.test(env.RELAY_ROUTING_KEY ?? ""))
     throw new Error("configuration_required");
   const key = Uint8Array.from(
@@ -238,6 +240,7 @@ export async function issueRoute(
     "agentId",
     "pairingEpoch",
     "pushToken",
+    "updatedAt",
     "issuedAt",
     "expiresAt",
   ]);
@@ -245,17 +248,34 @@ export async function issueRoute(
     value.deviceId !== pair.deviceId ||
     value.agentId !== pair.agentId ||
     value.pairingEpoch !== pair.pairingEpoch ||
+    !Number.isSafeInteger(value.updatedAt) ||
+    Number(value.updatedAt) < Number(value.issuedAt) * 1000 ||
+    Number(value.updatedAt) >= (now + 1) * 1000 ||
     typeof value.pushToken !== "string" ||
     !/^[0-9a-f]{64,200}$/.test(value.pushToken)
   )
     throw new Error("unauthorized");
-  const route = { ...value, issuedAt: now, expiresAt: now + 86400 };
+  const route = {
+    version: 1,
+    audience: origin,
+    deviceId: pair.deviceId,
+    agentId: pair.agentId,
+    pairingEpoch: pair.pairingEpoch,
+    pushToken: value.pushToken,
+  };
   const token = await new CompactEncrypt(
     new TextEncoder().encode(JSON.stringify(route)),
   )
     .setProtectedHeader({ alg: "dir", enc: "A256GCM", typ: "agw+route" })
     .encrypt(key);
-  return { route: token, expiresAt: route.expiresAt };
+  await destinationOperation(env, {
+    pair,
+    action: "register",
+    sealed: token,
+    issuedAt: Number(value.updatedAt),
+    now,
+  });
+  return { status: "registered" };
 }
 export async function verifyRequest(
   compact: string,
@@ -273,23 +293,21 @@ export async function verifyRequest(
     origin,
     now,
   );
-  exact(value, [
-    "version",
-    "audience",
-    "issuedAt",
-    "expiresAt",
-    "route",
-    "envelope",
-  ]);
-  if (typeof value.route !== "string") throw new Error("unauthorized");
-  const decoded = await compactDecrypt(value.route, key, {
+  exact(value, ["version", "audience", "issuedAt", "expiresAt", "envelope"]);
+  const request = envelope(value.envelope, pair, "request", now);
+  const destination = await destinationOperation(env, {
+    pair,
+    action: "resolve",
+    now,
+  });
+  const decoded = await compactDecrypt(destination.sealed!, key, {
     keyManagementAlgorithms: ["dir"],
     contentEncryptionAlgorithms: ["A256GCM"],
   });
   exact(decoded.protectedHeader, ["alg", "enc", "typ"]);
   const route = JSON.parse(
     new TextDecoder().decode(decoded.plaintext),
-  ) as Route;
+  ) as Destination;
   exact(route, [
     "version",
     "audience",
@@ -297,8 +315,6 @@ export async function verifyRequest(
     "agentId",
     "pairingEpoch",
     "pushToken",
-    "issuedAt",
-    "expiresAt",
   ]);
   if (
     decoded.protectedHeader.typ !== "agw+route" ||
@@ -306,12 +322,11 @@ export async function verifyRequest(
     route.audience !== origin ||
     route.deviceId !== pair.deviceId ||
     route.agentId !== pair.agentId ||
-    route.pairingEpoch !== pair.pairingEpoch ||
-    route.expiresAt <= now
+    route.pairingEpoch !== pair.pairingEpoch
   )
     throw new Error("unauthorized");
   return {
-    envelope: envelope(value.envelope, pair, "request", now),
+    envelope: request,
     pushToken: route.pushToken,
   };
 }
@@ -393,7 +408,7 @@ export async function directFetch(
   const url = new URL(request.url);
   if (
     !env.RELAY_ORIGIN ||
-    (!env.PAIRING_CONFIG && !env.PAIRINGS_REGISTRY) ||
+    !env.PAIRINGS_REGISTRY ||
     !env.RELAY_ROUTING_KEY ||
     !env.CHANNELS
   )
@@ -419,7 +434,7 @@ export async function directFetch(
         throw new Error("unauthorized");
       const input = await verifyRequest(auth.slice(7), env);
       const id = env.CHANNELS.idFromName(
-        `${input.envelope.context.pairingEpoch}:${input.envelope.context.requestId}`,
+        `${input.envelope.context.sender}:${input.envelope.context.recipient}:${input.envelope.context.pairingEpoch}:${input.envelope.context.requestId}`,
       );
       return (await env.CHANNELS.get(id).fetch("https://channel/open", {
         headers: {
@@ -430,18 +445,80 @@ export async function directFetch(
     }
     if (
       request.method !== "POST" ||
-      request.headers.get("Content-Type") !== "application/jose"
+      request.headers.get("Content-Type") !==
+        (url.pathname === "/v1/pairings/register"
+          ? "application/json"
+          : "application/jose")
     )
       return Response.json(
         { error: "invalid_request" },
         { status: 400, headers },
       );
     const compact = await boundedText(request, 92000);
+    if (url.pathname === "/v1/pairings/register") {
+      await selfRegisterPair(
+        env,
+        JSON.parse(compact),
+        publicOrigin(env.RELAY_ORIGIN),
+      );
+      return Response.json({ status: "registered" }, { headers });
+    }
     if (url.pathname === "/v1/routes")
       return Response.json(await issueRoute(compact, env), { headers });
+    if (["/v1/routes/disable", "/v1/pairings/revoke"].includes(url.pathname)) {
+      const hint = decodeJwt(compact);
+      const origin = publicOrigin(env.RELAY_ORIGIN!);
+      const current = await registryPair(env, registerHint(compact));
+      const pair = await validatePairRecord(
+        current?.pairingEpoch === hint.pairingEpoch
+          ? current
+          : url.pathname === "/v1/pairings/revoke" &&
+              typeof hint.deviceId === "string" &&
+              typeof hint.pairingEpoch === "string"
+            ? await retiredPair(env, hint.deviceId, hint.pairingEpoch)
+            : undefined,
+      );
+      const value = await proof(
+        compact,
+        pair.deviceSigningKey,
+        url.pathname === "/v1/routes/disable"
+          ? "agw+route-disable"
+          : "agw+unpair",
+        origin,
+        seconds(),
+      );
+      exact(value, [
+        "version",
+        "audience",
+        "deviceId",
+        "agentId",
+        "pairingEpoch",
+        "issuedAt",
+        "expiresAt",
+        "updatedAt",
+      ]);
+      if (
+        !Number.isSafeInteger(value.updatedAt) ||
+        Number(value.updatedAt) < Number(value.issuedAt) * 1000 ||
+        Number(value.updatedAt) >= (seconds() + 1) * 1000 ||
+        value.deviceId !== pair.deviceId ||
+        value.agentId !== pair.agentId ||
+        value.pairingEpoch !== pair.pairingEpoch
+      )
+        throw new Error("unauthorized");
+      if (url.pathname === "/v1/pairings/revoke") await deletePair(env, pair);
+      else
+        await destinationOperation(env, {
+          pair,
+          action: "disable",
+          issuedAt: Number(value.updatedAt),
+          now: seconds(),
+        });
+      return Response.json({ status: "revoked" }, { headers });
+    }
     const result = await verifyResult(compact, env);
     const id = env.CHANNELS.idFromName(
-      `${result.context.pairingEpoch}:${result.context.requestId}`,
+      `${result.context.recipient}:${result.context.sender}:${result.context.pairingEpoch}:${result.context.requestId}`,
     );
     return (await env.CHANNELS.get(id).fetch("https://channel/result", {
       method: "POST",
@@ -450,19 +527,24 @@ export async function directFetch(
   } catch (error) {
     const code = error instanceof Error ? error.message : "unauthorized";
     const status =
-      code === "oversize"
-        ? 413
-        : code === "transport_unavailable" || code === "configuration_required"
-          ? 503
-          : 401;
+      code === "rate_limited"
+        ? 429
+        : code === "oversize"
+          ? 413
+          : code === "transport_unavailable" ||
+              code === "configuration_required"
+            ? 503
+            : 401;
     return Response.json(
       {
         error:
-          status === 413
-            ? "oversize"
-            : status === 503
-              ? "transport_unavailable"
-              : "unauthorized",
+          status === 429
+            ? "rate_limited"
+            : status === 413
+              ? "oversize"
+              : status === 503
+                ? "transport_unavailable"
+                : "unauthorized",
       },
       { status, headers },
     );

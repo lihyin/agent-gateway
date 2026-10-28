@@ -1,8 +1,15 @@
+import { build } from "esbuild";
+import { createRequire } from "node:module";
+import { storePairRecord } from "../relay/src/registry.ts";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { publicIdentity, identityId } from "../agent-adapter/src/crypto.ts";
 import { issueRoute, verifyResult } from "../relay/src/direct.ts";
+// Match the relay's pinned test runtime, rather than Wrangler's hoisted alpha.
+const { Miniflare } = createRequire(
+  new URL("../relay/package.json", import.meta.url),
+)("miniflare");
 const fixture = JSON.parse(
   await readFile("protocol/fixtures/pairing.json", "utf8"),
 );
@@ -21,20 +28,40 @@ const pair = {
 };
 const env = {
   RELAY_ORIGIN: "https://relay.example.com",
-  PAIRING_CONFIG: JSON.stringify(pair),
   RELAY_ROUTING_KEY: randomBytes(32).toString("base64url"),
 };
-assert.equal((await issueRoute(registration.proof, env, 100)).expiresAt, 86500);
-const result = await verifyResult(
-  outcome.proof,
-  {
-    ...env,
-    PAIRING_CONFIG: JSON.stringify({ ...pair, pairingEpoch: outcome.epoch }),
+const bundle = await build({
+  entryPoints: ["relay/src/index.ts"],
+  bundle: true,
+  format: "esm",
+  platform: "browser",
+  write: false,
+});
+const mf = new Miniflare({
+  modules: true,
+  script: bundle.outputFiles[0].text,
+  compatibilityDate: "2026-08-06",
+  durableObjects: {
+    PAIRINGS_REGISTRY: { className: "PairingRegistry", useSQLite: true },
   },
-  100,
-);
-assert.equal(result.context.direction, "result");
-assert.ok(!JSON.stringify(result).includes("person@example.com"));
-console.log(
-  "Dart registration and result transport proofs verified by the relay in Node.",
-);
+});
+try {
+  env.PAIRINGS_REGISTRY =
+    await mf.getDurableObjectNamespace("PAIRINGS_REGISTRY");
+  assert.equal(await storePairRecord(env, pair), true);
+  assert.deepEqual(await issueRoute(registration.proof, env, 100), {
+    status: "registered",
+  });
+  assert.equal(
+    await storePairRecord(env, { ...pair, pairingEpoch: outcome.epoch }),
+    true,
+  );
+  const result = await verifyResult(outcome.proof, env, 100);
+  assert.equal(result.context.direction, "result");
+  assert.ok(!JSON.stringify(result).includes("person@example.com"));
+  console.log(
+    "Dart registration and result transport proofs verified by the relay in Node.",
+  );
+} finally {
+  await mf.dispose();
+}

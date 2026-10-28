@@ -94,8 +94,7 @@ export class PairingChannel {
       // device-signed proof. The relay consumes the frame — it is never
       // forwarded to the agent — and stores the record in the
       // PairingRegistry, so no operator step follows a pairing. Without a
-      // registry bound the frame is ignored (PAIRING_CONFIG deployments
-      // are unaffected); an invalid proof with a registry bound fails the
+      // registry bound the frame closes the session; an invalid proof fails the
       // session closed, like any other protocol violation. The frame
       // counts toward the existing per-socket frame bound (the phone
       // sends at most challenge, ready, receipt, pairing_record).
@@ -107,6 +106,10 @@ export class PairingChannel {
           frame = undefined;
         }
         if (frame?.kind === "pairing_record") {
+          if (!this.env.PAIRINGS_REGISTRY) {
+            this.close();
+            return;
+          }
           if (this.env.PAIRINGS_REGISTRY) {
             const registration = (async () => {
               try {

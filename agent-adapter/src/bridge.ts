@@ -295,7 +295,7 @@ export class Bridge {
       };
     });
   }
-  relayProof(id: string, route: string, audience: string): Promise<string> {
+  relayProof(id: string, audience: string): Promise<string> {
     return this.run(async () => {
       const job = this.state.jobs[id];
       if (
@@ -312,7 +312,6 @@ export class Bridge {
           audience,
           issuedAt: now,
           expiresAt: now + 30,
-          route,
           envelope: job.envelope,
         },
         "agw+request",

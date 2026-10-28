@@ -17,7 +17,25 @@ class ForegroundRelay {
   }) : origin = _origin(url),
        _client = client ?? http.Client(),
        clock = clock ?? DateTime.now,
-       notifications = notifications ?? NativePushNotifications();
+       notifications = notifications ?? NativePushNotifications() {
+    if (this.notifications is NativePushNotifications) {
+      (this.notifications as NativePushNotifications).onTokenChanged =
+          invalidateRegistration;
+    }
+  }
+  DateTime? _registeredAt;
+  String? _registeredAgent;
+  String? _enrolledEpoch;
+  void invalidateRegistration() => _registeredAt = null;
+  Future<void> refreshRegistration(PairedDelivery delivery) async {
+    if (_registeredAt != null &&
+        _registeredAgent == delivery.agentId &&
+        clock().difference(_registeredAt!) < const Duration(minutes: 1)) {
+      return;
+    }
+    await register(delivery);
+  }
+
   final String origin;
   final http.Client _client;
   final DateTime Function() clock;
@@ -44,8 +62,9 @@ class ForegroundRelay {
   Future<Map<String, dynamic>> _post(
     String path,
     String proof,
-    int expected,
-  ) async {
+    int expected, {
+    String contentType = 'application/jose',
+  }) async {
     final abort = Completer<void>();
     final deadline = Timer(const Duration(seconds: 12), () {
       if (!abort.isCompleted) abort.complete();
@@ -58,7 +77,7 @@ class ForegroundRelay {
               abortTrigger: abort.future,
             )
             ..followRedirects = false
-            ..headers['Content-Type'] = 'application/jose'
+            ..headers['Content-Type'] = contentType
             ..body = proof;
       final response = await _client
           .send(request)
@@ -85,7 +104,22 @@ class ForegroundRelay {
     }
   }
 
-  Future<String> register(PairedDelivery delivery) async {
+  Future<void> register(PairedDelivery delivery) async {
+    final epoch = delivery.agentId == null
+        ? null
+        : delivery.epoch(delivery.agentId!);
+    if (_enrolledEpoch != epoch || epoch == null) {
+      final enrolled = await _post(
+        '/v1/pairings/register',
+        jsonEncode(await delivery.pairRegistration(origin)),
+        200,
+        contentType: 'application/json',
+      );
+      if (enrolled['status'] != 'registered') {
+        throw const GatewayError('relay_unavailable');
+      }
+      _enrolledEpoch = epoch;
+    }
     final token = await notifications.register();
     if (!RegExp(r'^[0-9a-f]{64,200}$').hasMatch(token)) {
       throw const GatewayError('notifications_unavailable');
@@ -95,15 +129,29 @@ class ForegroundRelay {
       await delivery.registrationProof(origin, token),
       200,
     );
-    if (value.length != 2 ||
-        value['route'] is! String ||
-        (value['route'] as String).length > 3000 ||
-        value['expiresAt'] is! int ||
-        value['expiresAt'] <= clock().millisecondsSinceEpoch ~/ 1000) {
+    if (value.length != 1 || value['status'] != 'registered') {
       throw const GatewayError('relay_unavailable');
     }
-    await delivery.saveRoute(origin, value['route'], value['expiresAt']);
-    return value['route'];
+    _registeredAt = clock();
+    _registeredAgent = delivery.agentId;
+  }
+
+  Future<void> disable(PairedDelivery delivery) async {
+    await _post(
+      '/v1/routes/disable',
+      await delivery.controlProof(origin, 'agw+route-disable'),
+      200,
+    );
+    invalidateRegistration();
+  }
+
+  Future<void> revoke(PairedDelivery delivery) async {
+    await _post(
+      '/v1/pairings/revoke',
+      await delivery.controlProof(origin, 'agw+unpair'),
+      200,
+    );
+    invalidateRegistration();
   }
 
   Future<void> sync(PairedDelivery delivery, ReviewService review) async {

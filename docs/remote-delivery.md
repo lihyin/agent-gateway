@@ -26,19 +26,14 @@ needed. See [code pairing](pin-pairing.md), including interrupted-pair recovery.
 The [manual fallback](paired-delivery.md) remains available. No source credentials
 enter Muse's runtime. Pairing uses foreground sockets and does not send a push.
 
-With the client stopped, export the public transport pins:
-
-```sh
-node agent-adapter/dist/src/cli.js transport-config
-```
-
-Only public signing keys, endpoint IDs and the pairing epoch are printed. Do not
-upload the private agent state file to Cloudflare or share it in chat.
+Pairing automatically registers the public identities in the relay. No per-user
+Worker secret or transport-config upload is needed.
 
 ## 2. Configure the existing relay
 
 The Wrangler configuration binds `CHANNELS` to `RequestChannel` and `PAIRINGS` to
-`PairingChannel`, with `v1-channels` and `v2-pairing` class migrations for all environments.
+`PairingChannel`, and `PAIRINGS_REGISTRY` to `PairingRegistry`, with `v1-channels`, `v2-pairing`
+and `v3-pairing-registry` migrations for all environments.
 It stores no request/result mailbox and uses no application database.
 
 Set these Worker secrets separately for each environment, using Wrangler or the
@@ -47,7 +42,6 @@ Cloudflare dashboard:
 | Name                | Value                                                                            |
 | ------------------- | -------------------------------------------------------------------------------- |
 | `RELAY_ORIGIN`      | Exact public HTTPS origin for that environment.                                  |
-| `PAIRING_CONFIG`    | Public JSON from `transport-config`, including both signing keys.                |
 | `RELAY_ROUTING_KEY` | 32 cryptographically random bytes encoded as unpadded base64url (43 characters). |
 | `APNS_KEY_ID`       | Apple push signing key ID.                                                       |
 | `APNS_TEAM_ID`      | Apple developer team ID.                                                         |
@@ -55,7 +49,7 @@ Cloudflare dashboard:
 | `APNS_TOPIC`        | `com.agentbrain.agentgateway`.                                                   |
 | `APNS_ENVIRONMENT`  | `production` for TestFlight; `sandbox` for development-signed device builds.     |
 
-For example, `npx wrangler secret put PAIRING_CONFIG --config relay/wrangler.toml
+For example, `npx wrangler secret put RELAY_ROUTING_KEY --config relay/wrangler.toml
 --env staging` prompts for the value. Do not put secret values in shell arguments,
 source control, chat, logs, URLs or mobile Dart defines. The relay-only runtime
 requires no `BRIDGE_ORIGIN`, `BRIDGE_RELAY_TOKEN` or `MCP_ACCESS_TOKEN`; remove those
@@ -65,7 +59,7 @@ Unconfigured transport fails closed. Validate staging before production. Use the
 existing release pipeline to deploy an immutable tested revision, including the
 Durable Object migration, and build the matching phone app.
 
-## 3. Enable iPhone notifications and get a route
+## 3. Enable iPhone notifications once
 
 Enable Push Notifications for the Apple App ID and regenerate/select a matching
 provisioning profile in Codemagic. TestFlight uses the production APNs environment;
@@ -74,17 +68,18 @@ profiles are provider setup blockers, not something an unsigned test can establi
 
 Install the new app, connect Gmail and complete pairing. Enable **Relay
 notifications** and confirm locally, then accept iOS notification permission. The
-phone registers its current APNs token and copies one Gmail SKILL message with
-the relay origin and sealed route. Paste it into your trusted Muse conversation.
-The raw route remains available in the advanced transfer field for existing clients.
-Use **Refresh and copy Gmail skill + route** after token changes, app restoration,
-or the 24-hour route expiry. Paste the refreshed message into Muse. Automatic delivery
-of route replacements to Muse is not implemented.
+phone registers its current APNs token automatically. Muse needs only the original
+Gmail skill/setup message and its paired state; there is no delivery route to paste.
+The app updates registration on startup, returning to the foreground, and token
+changes detected while active. A stale token can require reopening the app; iOS
+background execution is not guaranteed. No daily action is needed.
+
+Disabling notifications or unpairing requires connectivity to revoke relay state.
+If the operation fails, reconnect and retry; the app reports the failure.
 
 ## 4. Request, review and return
 
-On the Muse-side client set `RELAY_URL` to the production relay origin and
-`RELAY_ROUTE` to the sealed route. Prepare `request.json` with a fresh UUID
+On the Muse-side client set `RELAY_URL` to the production relay origin. Prepare `request.json` with a fresh UUID
 `requestId`, `source: gmail`, `operation: search`, bounded `query`, `purpose`,
 `fields`, current Unix-second `since`/`until`, and `maxResults`. Supported fields
 are id/date/subject/from/snippet, at most ten messages over at most thirty days.
@@ -102,7 +97,7 @@ return encrypted through `/v1/results` to the waiting Muse connection. Only the
 Muse-side client decrypts and prints the verified outcome. No Gmail token is sent.
 
 For stdio MCP inside the agent runtime, launch `dist/src/mcp-server.js` with the
-same state path, `RELAY_URL` and `RELAY_ROUTE`. Requests return pending IDs promptly;
+same state path and `RELAY_URL`. Requests return pending IDs promptly;
 the process maintains outbound connections and `gateway_request_status` returns
 verified outcomes. Keep that process alive while awaiting review. Repeating an
 identical request restarts an interrupted transport without repeating Gmail access.

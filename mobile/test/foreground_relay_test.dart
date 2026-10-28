@@ -70,6 +70,18 @@ void main() {
       clock: () => now,
       notifications: notifications,
       client: MockClient((request) async {
+        if (request.url.path == '/v1/pairings/register') {
+          expect(request.headers['content-type'], 'application/json');
+          final frame = jsonDecode(request.body) as Map<String, dynamic>;
+          final proof = await verifyObject(
+            Map<String, dynamic>.from(publicIdentity(device)['signing']),
+            frame['proof'] as String,
+            'agw+pair-register',
+          );
+          expect(proof['deviceId'], identityId(device));
+          expect(frame['record']['deviceId'], identityId(device));
+          return http.Response(jsonEncode({'status': 'registered'}), 200);
+        }
         calls++;
         expect(request.followRedirects, false);
         expect(request.url.path, '/v1/results');
@@ -135,6 +147,18 @@ void main() {
       clock: () => now,
       notifications: FakePush(),
       client: MockClient((request) async {
+        if (request.url.path == '/v1/pairings/register') {
+          expect(request.headers['content-type'], 'application/json');
+          final frame = jsonDecode(request.body) as Map<String, dynamic>;
+          final proof = await verifyObject(
+            Map<String, dynamic>.from(publicIdentity(device)['signing']),
+            frame['proof'] as String,
+            'agw+pair-register',
+          );
+          expect(proof['deviceId'], identityId(device));
+          expect(frame['record']['deviceId'], identityId(device));
+          return http.Response(jsonEncode({'status': 'registered'}), 200);
+        }
         expect(request.url.path, '/v1/routes');
         final proof = await verifyObject(
           Map<String, dynamic>.from(publicIdentity(device)['signing']),
@@ -150,24 +174,89 @@ void main() {
             'epoch': delivery.epoch(identityId(agent)),
           }),
         );
+        return http.Response(jsonEncode({'status': 'registered'}), 200);
+      }),
+    );
+    addTearDown(relay.close);
+    await relay.register(delivery);
+    await delivery.initialize();
+    expect(delivery.relayEnabled(origin), isTrue);
+    now = DateTime.fromMillisecondsSinceEpoch(1000000, isUtc: true);
+    expect(delivery.relayEnabled(origin), isTrue);
+    await delivery.unpair();
+    expect(delivery.relayEnabled(origin), isFalse);
+    await expectLater(
+      delivery.registrationProof(origin, 'a' * 64),
+      throwsA(anything),
+    );
+  });
+  test('registration refreshes automatically without exporting a route; control updates are signed and monotonic', () async {
+    await delivery.enableRelay(origin, true);
+    final updates = <int>[];
+    final paths = <String>[];
+    final relay = ForegroundRelay(
+      origin,
+      clock: () => now,
+      notifications: FakePush(),
+      client: MockClient((request) async {
+        if (request.url.path == '/v1/pairings/register') {
+          expect(request.headers['content-type'], 'application/json');
+          final frame = jsonDecode(request.body) as Map<String, dynamic>;
+          final proof = await verifyObject(
+            Map<String, dynamic>.from(publicIdentity(device)['signing']),
+            frame['proof'] as String,
+            'agw+pair-register',
+          );
+          expect(proof['deviceId'], identityId(device));
+          expect(frame['record']['deviceId'], identityId(device));
+          return http.Response(jsonEncode({'status': 'registered'}), 200);
+        }
+        paths.add(request.url.path);
+        final type = switch (request.url.path) {
+          '/v1/routes/disable' => 'agw+route-disable',
+          '/v1/pairings/revoke' => 'agw+unpair',
+          _ => 'agw+register',
+        };
+        final proof = await verifyObject(
+          Map<String, dynamic>.from(publicIdentity(device)['signing']),
+          request.body,
+          type,
+        );
+        expect(proof['deviceId'], identityId(device));
+        expect(proof['agentId'], identityId(agent));
+        expect(proof['pairingEpoch'], delivery.epoch(identityId(agent)));
+        expect(proof.containsKey('route'), isFalse);
+        updates.add(proof['updatedAt'] as int);
         return http.Response(
-          jsonEncode({'route': 'opaque-route', 'expiresAt': 1000}),
+          jsonEncode({
+            'status': type == 'agw+register' ? 'registered' : 'revoked',
+          }),
           200,
         );
       }),
     );
     addTearDown(relay.close);
-    expect(await relay.register(delivery), 'opaque-route');
-    await delivery.initialize();
-    expect(delivery.relayRoute(origin), 'opaque-route');
-    now = DateTime.fromMillisecondsSinceEpoch(1000000, isUtc: true);
-    expect(delivery.relayRoute(origin), isNull);
-    await delivery.unpair();
-    expect(delivery.relayRoute(origin), isNull);
-    await expectLater(
-      delivery.registrationProof(origin, 'a' * 64),
-      throwsA(anything),
-    );
+    await relay.refreshRegistration(delivery);
+    await relay.refreshRegistration(delivery);
+    expect(paths, ['/v1/routes']);
+    now = now.add(const Duration(days: 2));
+    await relay.refreshRegistration(delivery);
+    relay.invalidateRegistration(); // Resume or native APNs token-change event.
+    await relay.refreshRegistration(delivery);
+    await relay.disable(delivery);
+    await delivery.initialize(); // High-water mark survives process restart.
+    await relay.revoke(delivery);
+    expect(paths, [
+      '/v1/routes',
+      '/v1/routes',
+      '/v1/routes',
+      '/v1/routes/disable',
+      '/v1/pairings/revoke',
+    ]);
+    for (var index = 1; index < updates.length; index++) {
+      expect(updates[index], greaterThan(updates[index - 1]));
+    }
+    expect(source.fetches, 0);
   });
   test('denied local confirmation, invalid push and provider failures grant no Gmail access', () async {
     confirmation.allowed = false;

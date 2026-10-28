@@ -6,7 +6,6 @@ export async function relayRequest(
   bridge: Bridge,
   id: string,
   origin: string,
-  route: string,
   signal?: AbortSignal,
   connect: (url: string, options: WebSocket.ClientOptions) => WebSocket = (
     url,
@@ -18,9 +17,7 @@ export async function relayRequest(
     url.protocol !== "https:" ||
     url.origin !== origin ||
     url.username ||
-    url.password ||
-    !route ||
-    route.length > 3000
+    url.password
   )
     throw new Error("configuration_required");
   for (;;) {
@@ -31,7 +28,7 @@ export async function relayRequest(
       .context;
     const remaining = context.expiresAt * 1000 - Date.now();
     if (remaining <= 0) return bridge.status(id);
-    const authorization = await bridge.relayProof(id, route, origin);
+    const authorization = await bridge.relayProof(id, origin);
     const outcome = await new Promise<"retry" | "received">(
       (resolve, reject) => {
         const socket = connect(

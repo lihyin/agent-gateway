@@ -4,8 +4,8 @@
 offer/receipt copying as the default. A transient thirty-minute relay room forwards
 library SRP-6a and encrypted signed pairing material; phone confirmation remains
 required. Full-fingerprint pairing is the advanced fallback. No extra server or
-persistent mailbox is introduced. Operator transport pins and notification route
-setup remain separate deployment steps.
+persistent mailbox is introduced. Public pairing records self-register. Notification destinations update automatically
+in PairingRegistry after a one-time phone opt-in; no daily route handoff is needed.
 
 **Architecture:** mobile-authoritative gateway and relay-only encrypted notification transport
 **Relay:** Cloudflare Worker / TypeScript / HTTPS

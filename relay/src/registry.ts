@@ -5,17 +5,8 @@ import type {
 import { compactVerify, importJWK } from "jose";
 import { exact, validatePairRecord, type Pair } from "./direct.js";
 
-// DESIGN SKETCH (draft PR — not yet wired into production configuration):
-// Multi-pair storage for the relay, replacing the single-pair PAIRING_CONFIG
-// secret. Records are public material only (signing public keys + IDs +
-// pairing epoch) — the exact object shape PAIRING_CONFIG holds today.
-//
-// Why a Durable Object: the relay already runs on DOs (CHANNELS, PAIRINGS),
-// and DO SQLite storage is strongly consistent, so a re-pair (new epoch) is
-// effective immediately — no KV propagation window where a freshly re-paired
-// user is still rejected. One global instance is enough: pair records are
-// tiny and reads are single-row lookups keyed by agentId or deviceId.
-
+// Durable authority for pairing identities and encrypted push destinations.
+// Request/result payloads and private endpoint keys never enter this registry.
 export interface RegistryEnvironment {
   PAIRINGS_REGISTRY?: DurableObjectNamespace;
   PROVISIONING_SECRET?: string;
@@ -34,11 +25,62 @@ export class PairingRegistry {
            updated_at INTEGER NOT NULL
          )`,
       );
+      this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS destinations (
+        device_id TEXT PRIMARY KEY, epoch TEXT NOT NULL, sealed TEXT NOT NULL,
+        issued_at INTEGER NOT NULL, window INTEGER NOT NULL DEFAULT 0,
+        attempts INTEGER NOT NULL DEFAULT 0)`);
+      this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS retired_epochs (
+        device_id TEXT NOT NULL, epoch TEXT NOT NULL, record TEXT NOT NULL, PRIMARY KEY(device_id, epoch))`);
     });
   }
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === "/retired" && request.method === "GET") {
+      const rows = this.ctx.storage.sql
+        .exec(
+          "SELECT record FROM retired_epochs WHERE device_id = ? AND epoch = ?",
+          url.searchParams.get("deviceId") ?? "",
+          url.searchParams.get("epoch") ?? "",
+        )
+        .toArray();
+      return rows.length
+        ? Response.json(JSON.parse(rows[0].record as string))
+        : new Response(null, { status: 404 });
+    }
+    if (url.pathname === "/revoke" && request.method === "POST") {
+      const pair = (await request.json()) as Pair;
+      const rows = this.ctx.storage.sql
+        .exec(`SELECT record FROM pairs WHERE device_id = ?`, pair.deviceId)
+        .toArray();
+      if (!rows.length || rows[0].record !== JSON.stringify(pair)) {
+        const retired = this.ctx.storage.sql
+          .exec(
+            "SELECT record FROM retired_epochs WHERE device_id = ? AND epoch = ?",
+            pair.deviceId,
+            pair.pairingEpoch,
+          )
+          .toArray();
+        return retired.length && retired[0].record === JSON.stringify(pair)
+          ? Response.json({ status: "revoked" })
+          : new Response(null, { status: 401 });
+      }
+      this.ctx.storage.sql.exec(
+        `INSERT OR IGNORE INTO retired_epochs VALUES (?, ?, ?)`,
+        pair.deviceId,
+        pair.pairingEpoch,
+        JSON.stringify(pair),
+      );
+      this.ctx.storage.sql.exec(
+        `DELETE FROM destinations WHERE device_id = ?`,
+        pair.deviceId,
+      );
+      this.ctx.storage.sql.exec(
+        `DELETE FROM pairs WHERE device_id = ?`,
+        pair.deviceId,
+      );
+      return Response.json({ status: "revoked" });
+    }
     if (url.pathname === "/pair" && request.method === "PUT") {
       // Body is a pair record already validated by the caller
       // (provisioningFetch / selfRegisterPair) via validatePairRecord.
@@ -46,6 +88,41 @@ export class PairingRegistry {
       // agent identity changed too, so clear any row for this agent or
       // device before inserting (device_id is UNIQUE).
       const pair = (await request.json()) as Pair;
+      const retired = this.ctx.storage.sql
+        .exec(
+          `SELECT epoch FROM retired_epochs WHERE device_id = ? AND epoch = ?`,
+          pair.deviceId,
+          pair.pairingEpoch,
+        )
+        .toArray();
+      if (retired.length) return new Response(null, { status: 409 });
+      const existing = this.ctx.storage.sql
+        .exec(
+          `SELECT record FROM pairs WHERE agent_id = ? OR device_id = ?`,
+          pair.agentId,
+          pair.deviceId,
+        )
+        .toArray()
+        .map((row) => JSON.parse(row.record as string) as Pair);
+      if (existing.some((old) => old.deviceId !== pair.deviceId))
+        return new Response(null, { status: 409 });
+      for (const old of existing) {
+        if (old.pairingEpoch === pair.pairingEpoch) {
+          if (JSON.stringify(old) !== JSON.stringify(pair))
+            return new Response(null, { status: 409 });
+          continue;
+        }
+        this.ctx.storage.sql.exec(
+          `INSERT OR IGNORE INTO retired_epochs VALUES (?, ?, ?)`,
+          old.deviceId,
+          old.pairingEpoch,
+          JSON.stringify(old),
+        );
+        this.ctx.storage.sql.exec(
+          `DELETE FROM destinations WHERE device_id = ?`,
+          old.deviceId,
+        );
+      }
       this.ctx.storage.sql.exec(
         `DELETE FROM pairs WHERE agent_id = ? OR device_id = ?`,
         pair.agentId,
@@ -79,14 +156,119 @@ export class PairingRegistry {
     }
     if (url.pathname === "/pair" && request.method === "DELETE") {
       const agentId = url.searchParams.get("agentId") ?? "";
+      const old = this.ctx.storage.sql
+        .exec(`SELECT record FROM pairs WHERE agent_id = ?`, agentId)
+        .toArray();
+      for (const row of old) {
+        const pair = JSON.parse(row.record as string) as Pair;
+        this.ctx.storage.sql.exec(
+          `INSERT OR IGNORE INTO retired_epochs VALUES (?, ?, ?)`,
+          pair.deviceId,
+          pair.pairingEpoch,
+          JSON.stringify(pair),
+        );
+        this.ctx.storage.sql.exec(
+          `DELETE FROM destinations WHERE device_id = ?`,
+          pair.deviceId,
+        );
+      }
       this.ctx.storage.sql.exec(
         `DELETE FROM pairs WHERE agent_id = ?`,
         agentId,
       );
       return Response.json({ status: "deleted" });
     }
+    if (url.pathname === "/destination" && request.method === "POST") {
+      const input = (await request.json()) as {
+        pair: Pair;
+        action: "register" | "resolve" | "disable";
+        sealed?: string;
+        issuedAt?: number;
+        now: number;
+      };
+      const rows = this.ctx.storage.sql
+        .exec(
+          `SELECT record FROM pairs WHERE device_id = ?`,
+          input.pair.deviceId,
+        )
+        .toArray();
+      if (!rows.length || rows[0].record !== JSON.stringify(input.pair))
+        return new Response(null, { status: 401 });
+      const current = this.ctx.storage.sql
+        .exec(
+          `SELECT * FROM destinations WHERE device_id = ?`,
+          input.pair.deviceId,
+        )
+        .toArray()[0];
+      if (input.action === "resolve") {
+        if (!current || !current.sealed)
+          return new Response(null, { status: 503 });
+        const window = Math.floor(input.now / 60);
+        const attempts =
+          current.window === window ? Number(current.attempts) : 0;
+        if (attempts >= 10) return new Response(null, { status: 429 });
+        this.ctx.storage.sql.exec(
+          `UPDATE destinations SET window = ?, attempts = ? WHERE device_id = ?`,
+          window,
+          attempts + 1,
+          input.pair.deviceId,
+        );
+        return Response.json({ sealed: current.sealed });
+      }
+      if (current && Number(current.issued_at) >= input.issuedAt!)
+        return new Response(null, { status: 409 });
+      this.ctx.storage.sql.exec(
+        `INSERT INTO destinations(device_id, epoch, sealed, issued_at)
+        VALUES (?, ?, ?, ?) ON CONFLICT(device_id) DO UPDATE SET epoch=excluded.epoch, sealed=excluded.sealed, issued_at=excluded.issued_at`,
+        input.pair.deviceId,
+        input.pair.pairingEpoch,
+        input.action === "disable" ? "" : input.sealed!,
+        input.issuedAt!,
+      );
+      return Response.json({ status: "registered" });
+    }
     return Response.json({ error: "not_found" }, { status: 404 });
   }
+}
+
+export async function destinationOperation(
+  env: RegistryEnvironment,
+  input: {
+    pair: Pair;
+    action: "register" | "resolve" | "disable";
+    sealed?: string;
+    issuedAt?: number;
+    now: number;
+  },
+): Promise<{ sealed?: string }> {
+  const response = await registryStub(env)!.fetch(
+    "https://registry/destination",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  if (!response.ok)
+    throw new Error(
+      response.status === 429
+        ? "rate_limited"
+        : response.status === 503
+          ? "transport_unavailable"
+          : "unauthorized",
+    );
+  return (await response.json()) as { sealed?: string };
+}
+
+export async function deletePair(
+  env: RegistryEnvironment,
+  pair: Pair,
+): Promise<void> {
+  // Compare in the same DO turn before deletion, so an old epoch cannot revoke a new pair.
+  const response = await registryStub(env)!.fetch(`https://registry/revoke`, {
+    method: "POST",
+    body: JSON.stringify(pair),
+  });
+  if (!response.ok) throw new Error("unauthorized");
 }
 
 function registryStub(env: RegistryEnvironment) {
@@ -199,17 +381,20 @@ export async function verifySelfRegistration(
   return pair;
 }
 
-// Verify a self-registration frame and store its record. Returns false when
-// no registry is bound (registration is then a no-op and the deployment
-// keeps relying on PAIRING_CONFIG / the provisioning endpoint); throws on
-// any validation failure so the caller can fail the pairing session closed.
+// Verify a self-registration frame and store its record. Without the registry
+// no transport authority exists; validation/storage failures close the session.
 export async function selfRegisterPair(
   env: RegistryEnvironment,
   frame: unknown,
   audience: string,
 ): Promise<boolean> {
-  if (!env.PAIRINGS_REGISTRY) return false;
-  return storePairRecord(env, await verifySelfRegistration(frame, audience));
+  if (!env.PAIRINGS_REGISTRY) throw new Error("configuration_required");
+  const stored = await storePairRecord(
+    env,
+    await verifySelfRegistration(frame, audience),
+  );
+  if (!stored) throw new Error("unauthorized");
+  return true;
 }
 
 // Operator provisioning path (bootstrap / recovery — see
@@ -244,4 +429,17 @@ export async function provisioningFetch(
     { status: ok ? "stored" : "not_found" },
     { status: ok ? 200 : 404, headers },
   );
+}
+
+// Retired records are available only for authenticating idempotent revocation,
+// never as a transport authorization fallback.
+export async function retiredPair(
+  env: RegistryEnvironment,
+  deviceId: string,
+  epoch: string,
+): Promise<Pair | undefined> {
+  const response = await registryStub(env)!.fetch(
+    "https://registry/retired?" + new URLSearchParams({ deviceId, epoch }),
+  );
+  return response.ok ? ((await response.json()) as Pair) : undefined;
 }

@@ -34,10 +34,12 @@ execution. A changed envelope under a reserved ID is rejected. Identical retries
 return the saved encrypted outcome, never repeat retrieval. Keep replay records
 beyond expiry (24 hours); a restart cannot reopen completed requests.
 
-Routing capabilities are sealed with relay-only dir/A256GCM JWE. They bind the
-relay audience, registered APNs token, paired IDs/epoch and a 24-hour expiry.
-Issuance requires a pinned-device ES256 ownership proof. Agent submission and
-device result proofs are separately signed and last at most 30 seconds. Neither
+Push destinations are encrypted at rest with relay-only dir/A256GCM JWE and
+bind relay audience, APNs token and paired IDs/epoch. They are internal registry
+records, not expiring capabilities transferred to the agent. Registration uses a
+30-second device ES256 proof with a strictly increasing millisecond updatedAt.
+Agent request proofs contain envelope and common transport claims only; no route.
+Device result proofs are separately signed and last at most 30 seconds. Neither
 caller-supplied callbacks nor replacement recipient keys are accepted. An internal
 live connection object routes ciphertext to the original Muse socket without
 persisting request/result bodies. Endpoints own recovery and durable replay state.

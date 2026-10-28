@@ -54,7 +54,6 @@ try {
         bridge,
         job.requestId,
         process.env.RELAY_URL ?? "",
-        process.env.RELAY_ROUTE ?? "",
       );
       break;
     }

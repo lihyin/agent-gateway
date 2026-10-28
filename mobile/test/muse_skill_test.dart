@@ -10,8 +10,8 @@ void main() {
     expect(message, contains('standard input'));
     expect(message, contains('RELAY_URL: $origin'));
     expect(message, contains('SKILL: Agent Gateway Gmail (v1)'));
-    expect(message, contains('Delivery route: not supplied yet'));
-    expect(message, contains('PAIRING_CONFIG'));
+    expect(message, contains('No route needs to be copied'));
+    expect(message, isNot(contains('PAIRING_CONFIG')));
     expect(message, contains('code that expires in thirty minutes'));
     expect(message, contains('Requests expire after five minutes'));
     expect(message, contains('Pending review is not a successful search'));
@@ -19,8 +19,11 @@ void main() {
   test(
     'existing pairing gets usable route configuration without a new code',
     () {
-      final message = museGmailSkill(origin: origin, route: 'sealed-route');
-      expect(message, contains('RELAY_ROUTE: sealed-route'));
+      final message = museGmailSkill(
+        origin: origin,
+        notificationsEnabled: true,
+      );
+      expect(message, contains('Routing updates automatically'));
       expect(message, contains('relay-request request.json'));
       expect(message, contains('gateway_request_status'));
       expect(message, isNot(contains('AGW1.')));

@@ -34,21 +34,44 @@ No Storage API, hibernation attachment or durable pairing mailbox is used. The
 phone independently enforces one proof/sequence/expiry against a malicious relay.
 Resets and disconnects need a fresh code; interrupted final handoff may require
 unpairing both endpoints. Pairing sends no push and grants no Gmail access.
-Operator `PAIRING_CONFIG` and sealed route setup remain separate. Global abuse
+Device-signed pair records register automatically in PairingRegistry. Global abuse
 quotas and physical-device acceptance remain operational checks. No audit is claimed.
 
 ## Relay-only transport
 
-The operator pins one paired device/agent's public signing keys and epoch in
-`PAIRING_CONFIG`. The device signs 30-second `agw+register` proofs containing its
-APNs token. The relay seals 24-hour routing capabilities using a separate
-32-byte AES-256-GCM routing key. This key never decrypts private request/results.
-Routes bind relay audience, both IDs, epoch and push destination. Tokens are
-replaced on APNs refresh/expiry and must be conveyed to Muse's runtime. Automatic
-route replacement distribution is not implemented.
+PairingRegistry is the sole transport authority for all users; there is no
+single-pair secret fallback. The phone signs 30-second `agw+register` proofs
+binding its APNs token, relay audience, both IDs, epoch and millisecond `updatedAt`.
+The registry accepts only strictly newer updates, including across disabling
+notifications; replays cannot restore a previous destination. The phone persists
+its update clock and refreshes registration on startup/resume, token-change
+notification, and at most once a minute during foreground polling.
+Before its first push registration in a process, the phone also submits the same
+device-signed pair record over HTTPS. This supports manual pairing and lost-frame
+recovery without operator credentials; retired epochs remain rejected.
 
-The agent signs `agw+request` proofs carrying the sealed route and encrypted
-request. The relay verifies them before APNs or socket allocation. The device
+Destinations are encrypted at rest with the relay-only 32-byte AES-256-GCM
+routing key. No route capability leaves the relay and no daily expiry/copy step
+exists. The key cannot decrypt private request/results. A verified agent request
+contains only the encrypted envelope plus common transport claims; the relay
+resolves the destination for the verified pair, never a caller-chosen recipient.
+There is a durable limit of ten delivery attempts per pair per minute, including
+retries; this does not replace account-wide Cloudflare abuse controls.
+
+Device-signed `agw+route-disable` clears the destination while retaining its
+update high-water mark. Device-signed `agw+unpair` deletes the pair and destination.
+The app requires a successful online relay response before completing disable or
+unpair; on failure it reports an error and preserves the pairing for retry.
+Re-pairing clears the old destination and retires the previous epoch. Retired
+epoch records prevent old registration proofs from restoring revoked pairs.
+A device cannot overwrite a different device's agent ID. Existing pairs retain
+their destination on an identical pair registration. Retired epoch records retain
+public pairing metadata to authenticate idempotent revocation retries; they never
+authorize transport and currently have no automatic pruning.
+
+Self-registration remains open to any valid device-signed pair; signup gating
+and global quotas are deployment policy, not implied by per-pair authentication.
+Private payload encryption and phone authorization are unchanged. The device
 independently authenticates/decrypts before review. The device signs encrypted
 result submissions as `agw+result`. The relay matches full context to the active
 Muse connection; the Muse-side client verifies/decrypts and durably saves results.
@@ -57,8 +80,9 @@ expired proofs and oversized data fail closed. Transport proofs last at most
 30 seconds; original requests at most five minutes. Retries do not extend expiry.
 
 A Cloudflare Durable Object inside the relay coordinates a live receive-only
-WebSocket per request. There is no application database, Storage API usage,
-durable queue or result-polling mailbox. Attachments contain authenticated
+WebSocket per request. There is no request/result database, durable queue or result-polling mailbox.
+Only PairingRegistry persists pairing identities, encrypted push destinations,
+update clocks, rate counters and revoked epochs. Attachments contain authenticated
 context and a ciphertext digest only. Ciphertext and APNs tokens are not retained
 in attachments. A timer bounds connection life to the original expiry. Relay
 resets/disconnections fail closed; endpoint state is authoritative for recovery.

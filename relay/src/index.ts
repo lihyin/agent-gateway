@@ -19,7 +19,16 @@ export default {
     if (path.startsWith("/v1/pairing/")) return pairingFetch(request, env);
     if (path === "/v1/pairings" && request.method === "POST")
       return provisioningFetch(request, env);
-    if (["/v1/routes", "/v1/requests", "/v1/results"].includes(path))
+    if (
+      [
+        "/v1/routes",
+        "/v1/routes/disable",
+        "/v1/pairings/revoke",
+        "/v1/pairings/register",
+        "/v1/requests",
+        "/v1/results",
+      ].includes(path)
+    )
       return directFetch(request, env);
     if (path !== "/health")
       return Response.json({ error: "not_found" }, { status: 404, headers });

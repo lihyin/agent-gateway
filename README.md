@@ -11,7 +11,9 @@ Gmail credentials and phone private keys stay on the iPhone. The relay cannot
 fetch Gmail, read private payloads or grant approval.
 
 The relay uses an internal Cloudflare Durable Object for bounded live connection
-coordination, without an application database or request/result mailbox. This is
+coordination, without a request/result database or mailbox. PairingRegistry stores
+public pairing records and encrypted push destinations for automatic multi-user
+routing, with no daily route copying. This is
 an explicit revision of the earlier strictly stateless/callback-only design.
 Endpoints retain durable request/replay/result state and retry within five minutes.
 

@@ -8,17 +8,12 @@ async function main() {
   const path = process.env.GATEWAY_AGENT_STATE;
   if (!path) throw new Error("configuration_required");
   const { bridge, close } = await openBridge(path);
-  const origin = process.env.RELAY_URL,
-    route = process.env.RELAY_ROUTE;
-  if (Boolean(origin) !== Boolean(route)) {
-    await close();
-    throw new Error("configuration_required");
-  }
+  const origin = process.env.RELAY_URL;
   const controller = new AbortController();
   const active = new Map<string, Promise<unknown>>();
   const server = createMcpServer(bridge, Boolean(origin), (id) => {
-    if (!origin || !route || active.has(id)) return;
-    const task = relayRequest(bridge, id, origin, route, controller.signal)
+    if (!origin || active.has(id)) return;
+    const task = relayRequest(bridge, id, origin, controller.signal)
       .catch(() => {
         if (!controller.signal.aborted)
           process.stderr.write(

@@ -196,20 +196,6 @@ class PairedDelivery {
         await _save('transport.relay', value);
         _relay = value;
       });
-  String? relayRoute(String origin) =>
-      relayEnabled(origin) &&
-          (_relay?['expiresAt'] as int? ?? 0) >
-              clock().millisecondsSinceEpoch ~/ 1000
-      ? (_relay?['route'] as String?)
-      : null;
-  Future<void> saveRoute(String origin, String route, int expiresAt) =>
-      _serial.run(() async {
-        _check();
-        if (!relayEnabled(origin)) throw const GatewayError('unpaired');
-        final value = {..._relay!, 'route': route, 'expiresAt': expiresAt};
-        await _save('transport.relay', value);
-        _relay = value;
-      });
   // Self-registration frame for the relay's PairingRegistry: the pair
   // record (public transport configuration) plus a device-signed proof
   // (typ agw+pair-register) binding the record's IDs and epoch to this
@@ -246,6 +232,16 @@ class PairedDelivery {
           }, 'agw+pair-register'),
         };
       });
+  Future<int> _nextRoutingUpdate() async {
+    final time = clock().millisecondsSinceEpoch;
+    final previous =
+        (await vault.read('transport.routing-clock'))?['updatedAt'] as int? ??
+        0;
+    final next = time > previous ? time : previous + 1;
+    await _save('transport.routing-clock', {'updatedAt': next});
+    return next;
+  }
+
   Future<String> registrationProof(String origin, String pushToken) =>
       _serial.run(() async {
         _check();
@@ -260,7 +256,24 @@ class PairedDelivery {
           'issuedAt': now,
           'expiresAt': now + 30,
           'pushToken': pushToken,
+          'updatedAt': await _nextRoutingUpdate(),
         }, 'agw+register');
+      });
+  Future<String> controlProof(String origin, String type) =>
+      _serial.run(() async {
+        _check();
+        if (_pair == null) throw const GatewayError('unpaired');
+        final now = clock().millisecondsSinceEpoch ~/ 1000;
+        return signObject(_identity!, {
+          'version': 1,
+          'audience': origin,
+          'deviceId': identityId(_identity!),
+          'agentId': _pair!['agentId'],
+          'pairingEpoch': _pair!['epoch'],
+          'issuedAt': now,
+          'expiresAt': now + 30,
+          'updatedAt': await _nextRoutingUpdate(),
+        }, type);
       });
   Future<String> resultProof(String origin, Map<String, dynamic> envelope) =>
       _serial.run(() async {

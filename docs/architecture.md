@@ -38,28 +38,16 @@ state inside Muse's runtime.
 ## Authentication and routing
 
 The phone and Muse-side client generate separate signing and encryption keys and
-complete [one-time-code pairing](pin-pairing.md), with full-fingerprint comparison as an advanced fallback. A separate live PairingChannel inside the same relay forwards public SRP values and encrypted signed offers/receipts for at most thirty minutes, without storage, payload attachments, or endpoint secrets. Resets require a fresh code. The operator pins both public signing keys, IDs
-and the epoch in the relay's `PAIRING_CONFIG`. This implementation supports one
-configured pairing per relay deployment. Private keys stay at the endpoints.
+complete [one-time-code pairing](pin-pairing.md), with full-fingerprint comparison as an advanced fallback. A separate live PairingChannel inside the same relay forwards public SRP values and encrypted signed offers/receipts for at most thirty minutes, without storage, payload attachments, or endpoint secrets. Resets require a fresh code. The phone registers its device-signed public pair record in PairingRegistry.
+The registry supports multiple users and is the sole transport authority.
+Private keys stay at the endpoints.
 
-The phone signs a short-lived APNs registration request. The relay returns a
-24-hour routing capability sealed with a relay-only AES-256-GCM key. The sealed
-capability carries the APNs token, audience, paired identities and epoch; it is
-copied to the Muse-side client. It never grants Gmail access. Refresh the route
-after token changes or expiry. Re-pairing requires updating the relay's public
-configuration. Unpairing immediately revokes phone authorization, while transport
-revocation is completed by replacing the pinned epoch/configuration.
-
-Muse signs a fresh 30-second transport proof containing the sealed route and
-unchanged encrypted request. The relay verifies it before opening a request
-channel or sending APNs. The phone independently verifies/decrypts the nested
-JOSE envelope and enforces expiry/replay/scope before showing the review.
-
-The phone signs each encrypted result submission. The relay authenticates the
-phone and matches the result to the original live connection's identities,
-epoch, request ID and timestamps. Muse verifies/decrypts and saves the approved
-result locally. A relay `handed_off` acknowledgment means socket handoff, not
-verified agent receipt. Endpoint retries are idempotent and never extend expiry.
+The phone registers its APNs token with a short-lived signed proof. The relay
+persists only an encrypted destination bound to the pair and automatically looks
+it up after verifying each agent request. No daily route handoff is needed.
+Token updates are automatic while the app runs and on resume. Disabling delivery
+or unpairing revokes server state with a device signature; re-pairing retires the
+old epoch and clears its destination. See [security](security.md).
 
 ## Device behavior
 

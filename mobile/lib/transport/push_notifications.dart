@@ -7,6 +7,12 @@ abstract class PushNotifications {
 }
 
 class NativePushNotifications implements PushNotifications {
+  NativePushNotifications() {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'tokenChanged') onTokenChanged?.call();
+    });
+  }
+  void Function()? onTokenChanged;
   static const _channel = MethodChannel('agent_gateway/push');
   @override
   Future<String> register() async =>

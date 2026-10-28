@@ -61,7 +61,6 @@ test("outbound agent client verifies approved/denied ciphertext and reuses its d
       };
       const signed = await bridge.relayProof(
         job.requestId,
-        "sealed-route",
         "https://relay.example.com",
       );
       assert.deepEqual(
@@ -78,7 +77,6 @@ test("outbound agent client verifies approved/denied ciphertext and reuses its d
         bridge,
         job.requestId,
         "https://relay.example.com",
-        "sealed-route",
         undefined,
         connect,
       );
@@ -89,7 +87,6 @@ test("outbound agent client verifies approved/denied ciphertext and reuses its d
           bridge,
           job.requestId,
           "https://relay.example.com",
-          "sealed-route",
           undefined,
           connect,
         ),
@@ -129,7 +126,6 @@ test("cancelled outbound work cannot become a completed disclosure", async () =>
       bridge,
       job.requestId,
       "https://relay.example.com",
-      "route",
       controller.signal,
     ),
     /cancelled/,

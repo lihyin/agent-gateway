@@ -47,16 +47,12 @@ approvals still expire within five minutes; only the code-pairing window changed
 
 ## Enable notification delivery separately
 
-Pairing establishes endpoint trust; it does not modify Cloudflare operator secrets.
-Update `PAIRING_CONFIG` using the CLI's returned `transportConfiguration` (or
-`transport-config`). This remains necessary after every re-pair because the epoch
-changes. The relay never accepts unauthenticated public-key registration.
-Then enable **Relay notifications** on the phone, grant notification permission,
-and paste the automatically copied **Gmail skill + route** message into Muse.
-Already paired users can tap **Copy Gmail skill** without re-pairing; expired routes
-are omitted. **Refresh and copy Gmail skill + route** refreshes and copies in one
-action. See [relay setup](remote-delivery.md).
-Route refresh/distribution remains a separate step. Pairing itself sends no push.
+Pairing registers device-signed public transport identities in PairingRegistry.
+Enable **Relay notifications** on the phone once and grant iOS permission.
+The relay stores the encrypted push destination and selects it using the verified
+pairing. No per-user secret edit, route copying or daily refresh is required.
+The original setup message already contains the reusable Gmail skill.
+See [relay setup](remote-delivery.md). Pairing itself sends no push.
 
 ## Recovery
 

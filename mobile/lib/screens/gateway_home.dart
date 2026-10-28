@@ -488,7 +488,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                         if (c.pinPairing != null) _pinPairing(c),
                         if (c.museSkill != null) ...[
                           const Text(
-                            'Paste the Gmail skill into Meta Muse to teach it how to request email through your paired relay. Enable notifications below to include the delivery route.',
+                            'Paste the Gmail skill into Meta Muse to teach it how to request email through your paired relay. Enable notifications below once; routing updates automatically.',
                           ),
                           FilledButton.tonal(
                             onPressed: c.busy
@@ -508,27 +508,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                                 ? null
                                 : (enabled) async {
                                     await c.enableRelay(enabled);
-                                    if (enabled &&
-                                        c.error == null &&
-                                        c.museSkill != null) {
-                                      await _copyMuseMessage(c.museSkill!);
-                                    }
                                   },
-                          ),
-                        if (c.relayEnabled)
-                          TextButton(
-                            onPressed: c.busy
-                                ? null
-                                : () async {
-                                    await c.refreshRelayRoute();
-                                    if (c.error == null &&
-                                        c.museSkill != null) {
-                                      await _copyMuseMessage(c.museSkill!);
-                                    }
-                                  },
-                            child: const Text(
-                              'Refresh and copy Gmail skill + route',
-                            ),
                           ),
                         Text(
                           'Agent fingerprint: ${c.delivery!.agentFingerprint}',
@@ -658,7 +638,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
     'relay_unavailable' => 'Relay delivery is unavailable. Keep the app open to retry before the request expires.',
     'relay_configuration_required' =>
       'Relay delivery needs a configured HTTPS relay in this build.',
-    'notifications_unavailable' => 'Enable notifications for Agent Gateway in iPhone Settings, then refresh the delivery route.',
+    'notifications_unavailable' => 'Enable notifications for Agent Gateway in iPhone Settings, then reopen the app.',
     'unpaired' => 'The request does not match the current paired agent.',
     'replay_changed_content' =>
       'This request identity was already used or its content changed.',

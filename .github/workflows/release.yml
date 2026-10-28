@@ -48,6 +48,23 @@ jobs:
           CM_API_TOKEN: ${{ secrets.CM_API_TOKEN }}
           CM_APP_ID: ${{ vars.CM_APP_ID }}
         run: node scripts/require-release-config.mjs
+      - name: Check relay transport secrets before deployment
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_SEND_METRICS: "false"
+        run: |
+          for target in staging production; do
+            npx wrangler secret list --config relay/wrangler.toml --env "$target" > "$RUNNER_TEMP/relay-secret-names.json"
+            TARGET_ENVIRONMENT="$target" SECRET_NAMES_FILE="$RUNNER_TEMP/relay-secret-names.json" node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          const names = new Set(JSON.parse(readFileSync(process.env.SECRET_NAMES_FILE, 'utf8')).map(item => item.name));
+          const required = ['RELAY_ROUTING_KEY', 'APNS_KEY_ID', 'APNS_TEAM_ID', 'APNS_PRIVATE_KEY', 'APNS_TOPIC', 'APNS_ENVIRONMENT'];
+          const missing = required.filter(name => !names.has(name));
+          if (missing.length) throw new Error(`${process.env.TARGET_ENVIRONMENT}: missing Worker secrets: ${missing.join(', ')}`);
+          console.log(`${process.env.TARGET_ENVIRONMENT}: all required transport secret names are configured.`);
+          JS
+          done
       - name: Deploy staging and verify release
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}

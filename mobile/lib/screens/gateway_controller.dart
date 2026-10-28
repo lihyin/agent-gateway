@@ -84,7 +84,7 @@ class GatewayController extends ChangeNotifier {
       ? null
       : museGmailSkill(
           origin: relay!.origin,
-          route: delivery!.relayRoute(relay!.origin),
+          notificationsEnabled: relayEnabled,
         );
   bool connected = false, busy = false, ready = false;
   String? error;
@@ -125,6 +125,7 @@ class GatewayController extends ChangeNotifier {
     connected = await session.isConnected();
     ready = true;
     await _reload();
+    await _sync();
   });
   Future<void> _reload() async {
     entries = await review.entries();
@@ -132,6 +133,7 @@ class GatewayController extends ChangeNotifier {
   }
 
   Future<void> _sync() async {
+    if (foreground && relayEnabled) await relay!.refreshRegistration(delivery!);
     if (foreground && connected && relayEnabled) {
       await relay!.sync(delivery!, review);
       await _reload();
@@ -146,9 +148,11 @@ class GatewayController extends ChangeNotifier {
     if (relay == null || delivery == null) {
       throw const GatewayError('relay_configuration_required');
     }
+    if (!enabled) await relay!.disable(delivery!);
     await delivery!.enableRelay(relay!.origin, enabled);
     if (enabled) {
-      exported = await relay!.register(delivery!);
+      await relay!.register(delivery!);
+      exported = null;
     } else {
       exported = null;
     }
@@ -159,10 +163,6 @@ class GatewayController extends ChangeNotifier {
     await session.connect();
     connected = true;
     await _reload();
-  });
-  Future<void> refreshRelayRoute() => _run(() async {
-    if (!relayEnabled) throw const GatewayError('relay_configuration_required');
-    exported = await relay!.register(delivery!);
   });
   Future<void> disconnect() => _run(() async {
     connected = false;
@@ -236,6 +236,7 @@ class GatewayController extends ChangeNotifier {
   });
   void obscure() {
     foreground = false;
+    relay?.invalidateRegistration();
     entries = [];
     exported = null;
     _notify();
@@ -248,6 +249,9 @@ class GatewayController extends ChangeNotifier {
   });
   Future<void> unpair() => _run(() async {
     cancelPinPairing();
+    if (relay != null && delivery?.agentId != null) {
+      await relay!.revoke(delivery!);
+    }
     await delivery?.unpair();
     exported = null;
     await review.cancelAll();
