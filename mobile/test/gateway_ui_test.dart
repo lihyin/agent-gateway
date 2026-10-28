@@ -79,6 +79,14 @@ void main() {
   setUpAll(() async {
     final sdk = Platform.environment['FLUTTER_ROOT'] ?? '../.tools/flutter';
     final fonts = '$sdk/bin/cache/artifacts/material_fonts';
+    // Real fonts improve local screenshots; widget assertions also run with
+    // Flutter's test font on SDK installations without these optional assets.
+    if (!File('$fonts/roboto-regular.ttf').existsSync() ||
+        !File('$fonts/roboto-medium.ttf').existsSync() ||
+        !File('$fonts/roboto-bold.ttf').existsSync() ||
+        !File('$fonts/materialicons-regular.otf').existsSync()) {
+      return;
+    }
     final text = FontLoader('Roboto');
     for (final font in [
       'roboto-regular.ttf',
