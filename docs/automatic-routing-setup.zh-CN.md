@@ -48,6 +48,16 @@
 分别检查实际使用的环境。`RELAY_ROUTING_KEY` 和 `APNS_PRIVATE_KEY` 必须使用
 Secret 类型；其余四项是公共配置，使用普通 Variable 或 Secret 均可。
 Wrangler 的 `keep_vars` 已开启，防止部署清除控制台配置的普通变量。
+GitHub 的发布和恢复部署命令还显式使用 `--keep-vars`；CI 会检查这两层保护。
+部署前后均验证推送配置名称。早期部署已删除的值需要补回一次，保留选项不会自动恢复。
+手工部署必须使用最新 `relay-architecture` checkout 和仓库的配置文件，例如：
+
+```sh
+npx wrangler deploy --config relay/wrangler.toml --env production --keep-vars
+```
+
+正式发布优先使用 GitHub Actions，以正确设置 RELEASE_SHA 和 RELAY_ORIGIN。
+不要从旧 checkout 部署，也不要回滚到变量被删除时的旧版本。
 
 | 名称              | 配置                                                                                  |
 | ----------------- | ------------------------------------------------------------------------------------- |

@@ -19,6 +19,30 @@ for (const path of [
 }
 
 const codemagic = parseDocument(readFileSync("codemagic.yaml", "utf8")).toJS();
+// Dashboard transport variables must survive every repository-managed deployment.
+const wranglerTopLevel = readFileSync("relay/wrangler.toml", "utf8").split(
+  /\r?\n\[/,
+)[0];
+if (!/^keep_vars\s*=\s*true\s*$/m.test(wranglerTopLevel))
+  throw new Error("relay/wrangler.toml must set top-level keep_vars = true");
+for (const path of [
+  ".github/workflows/release.yml",
+  ".github/workflows/relay-recovery.yml",
+]) {
+  const commands = readFileSync(path, "utf8")
+    .split(/\r?\n/)
+    .filter((line) => /\bnpx wrangler deploy\b/.test(line));
+  if (
+    !commands.length ||
+    commands.some((line) => !line.includes("--keep-vars"))
+  )
+    throw new Error(
+      `${path}: every relay deployment must explicitly use --keep-vars`,
+    );
+}
+console.log(
+  "Relay deploys preserve dashboard variables via config and CLI flags",
+);
 const bundleId =
   codemagic.workflows["ios-release"].environment.ios_signing.bundle_identifier;
 const project = readFileSync(
