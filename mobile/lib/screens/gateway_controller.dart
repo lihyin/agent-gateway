@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/foundation.dart';
 
 import '../approvals/local_confirmation.dart';
@@ -8,7 +6,6 @@ import '../connectors/gmail_auth.dart';
 import '../connectors/gmail_connector.dart';
 import '../domain/gateway_configuration.dart';
 import '../domain/gateway_error.dart';
-import '../domain/gmail_request.dart';
 import '../domain/muse_skill.dart';
 import '../transport/paired_delivery.dart';
 import '../transport/foreground_relay.dart';
@@ -35,8 +32,7 @@ class GatewayController extends ChangeNotifier {
       vault: vault,
       source: GmailConnector(session),
       confirmation: DeviceConfirmation(),
-      currentEpoch: (id) =>
-          id == 'device-owner' ? 'local-preview-v1' : delivery.epoch(id),
+      currentEpoch: delivery.epoch,
     );
     return GatewayController(
       session: session,
@@ -67,7 +63,6 @@ class GatewayController extends ChangeNotifier {
           confirm: confirm,
         );
         pinPairing = pairing;
-        exported = null;
         await pairing.start();
       });
   void cancelPinPairing() {
@@ -82,7 +77,6 @@ class GatewayController extends ChangeNotifier {
   bool get pairingComplete =>
       delivery?.agentId != null &&
       (pinPairing == null || pinPairing!.status == 'paired');
-  String? exported;
   String? get museSkill => relay == null || delivery?.agentId == null
       ? null
       : museGmailSkill(
@@ -92,6 +86,20 @@ class GatewayController extends ChangeNotifier {
   bool connected = false, busy = false, ready = false;
   String? error;
   List<ReviewEntry> entries = [];
+  List<ReviewEntry> get pendingEntries => entries
+      .where(
+        (entry) =>
+            entry.request.agentId == delivery?.agentId &&
+            delivery?.epoch(entry.request.agentId) ==
+                entry.request.pairingEpoch &&
+            entry.request.expiresAt.isAfter(DateTime.now()) &&
+            [
+              ReviewState.access,
+              ReviewState.fetching,
+              ReviewState.disclosure,
+            ].contains(entry.state),
+      )
+      .toList(growable: false);
   List<Map<String, dynamic>> rules = [];
   bool _disposed = false;
   Future<void> _run(Future<void> Function() task) async {
@@ -131,7 +139,15 @@ class GatewayController extends ChangeNotifier {
     await _sync();
   });
   Future<void> _reload() async {
-    entries = await review.entries();
+    entries = (await review.entries())
+        .where(
+          (entry) => [
+            ReviewState.access,
+            ReviewState.fetching,
+            ReviewState.disclosure,
+          ].contains(entry.state),
+        )
+        .toList(growable: false);
     rules = await review.rules();
   }
 
@@ -153,12 +169,7 @@ class GatewayController extends ChangeNotifier {
     }
     if (!enabled) await relay!.disable(delivery!);
     await delivery!.enableRelay(relay!.origin, enabled);
-    if (enabled) {
-      await relay!.register(delivery!);
-      exported = null;
-    } else {
-      exported = null;
-    }
+    if (enabled) await relay!.register(delivery!);
     await _sync();
   });
   Future<void> connect() => _run(() async {
@@ -174,41 +185,6 @@ class GatewayController extends ChangeNotifier {
     rules = [];
     await review.cancelAll();
     await session.disconnect();
-  });
-  Future<void> requestPreview(
-    String query,
-    String purpose, {
-    bool includeSensitive = false,
-  }) => _run(() async {
-    if (!connected) throw const GatewayError('gmail_disconnected');
-    final now = DateTime.now().toUtc();
-    final random = Random.secure();
-    final id = List.generate(
-      16,
-      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
-    ).join();
-    await review.begin(
-      GmailRequest(
-        id: id,
-        agentId: 'device-owner',
-        pairingEpoch: 'local-preview-v1',
-        query: query,
-        purpose: purpose,
-        fields: {
-          'id',
-          'date',
-          'subject',
-          if (includeSensitive) 'from',
-          if (includeSensitive) 'snippet',
-        },
-        since: now.subtract(const Duration(days: 7)),
-        until: now,
-        maxResults: 5,
-        issuedAt: now,
-        expiresAt: now.add(const Duration(minutes: 5)),
-      ),
-    );
-    await _reload();
   });
   Future<void> access(ReviewEntry entry, bool allow) => _run(() async {
     if (allow) {
@@ -234,47 +210,28 @@ class GatewayController extends ChangeNotifier {
     await _reload();
     await _sync();
   });
-  Future<void> revoke(String scope) => _run(() async {
-    await review.revokeRule(scope);
+  Future<void> clearSavedApprovals() => _run(() async {
+    for (final rule in await review.rules()) {
+      await review.revokeRule(rule['scope'] as String);
+    }
     await _reload();
   });
   void obscure() {
     foreground = false;
     relay?.invalidateRegistration();
     entries = [];
-    exported = null;
     _notify();
   }
 
-  Future<void> pair(String offer, String fingerprint) => _run(() async {
-    cancelPinPairing();
-    if (delivery == null) throw const GatewayError('invalid_pairing');
-    exported = await delivery!.pair(offer.trim(), fingerprint);
-  });
   Future<void> unpair() => _run(() async {
     cancelPinPairing();
     if (relay != null && delivery?.agentId != null) {
       await relay!.revoke(delivery!);
     }
     await delivery?.unpair();
-    exported = null;
     await review.cancelAll();
     await _reload();
   });
-  Future<void> importEncrypted(String envelope) => _run(() async {
-    if (!connected || delivery == null) {
-      throw const GatewayError('gmail_disconnected');
-    }
-    exported = null;
-    await delivery!.importRequest(envelope.trim(), review);
-    await _reload();
-  });
-  Future<void> exportEncrypted(ReviewEntry entry) => _run(() async {
-    exported = null;
-    if (delivery == null) throw const GatewayError('invalid_envelope');
-    exported = await delivery!.exportResult(entry, review);
-  });
-
   @override
   void dispose() {
     _disposed = true;

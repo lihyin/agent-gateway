@@ -63,8 +63,7 @@ class ReviewService {
   final Vault vault;
   final GmailSource source;
   final LocalConfirmation confirmation;
-  // Only a trusted pairing service may supply this resolver. The shipped UI uses
-  // a device-owner preview identity; no network agent is accepted.
+  // Only the trusted pairing service may supply this resolver.
   final String? Function(String agentId) currentEpoch;
   final DateTime Function() clock;
   final _serial = SerialExecutor();

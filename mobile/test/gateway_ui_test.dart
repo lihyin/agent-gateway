@@ -1,13 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agentgateway/main.dart';
 import 'package:agentgateway/approvals/review_service.dart';
 import 'package:agentgateway/connectors/gmail_auth.dart';
 import 'package:agentgateway/domain/gateway_configuration.dart';
+import 'package:agentgateway/domain/gmail_request.dart';
 import 'package:agentgateway/screens/gateway_controller.dart';
 import 'package:agentgateway/transport/paired_delivery.dart';
 import 'package:agentgateway/transport/foreground_relay.dart';
@@ -15,11 +18,91 @@ import 'package:agentgateway/transport/pin_pairing.dart';
 
 import 'support/fakes.dart';
 
+class _PairingController extends GatewayController {
+  _PairingController({
+    required super.session,
+    required super.review,
+    required super.gmailConfigured,
+    required super.delivery,
+    required super.relay,
+  });
+  int starts = 0;
+  @override
+  Future<void> startPinPairing(Future<bool> Function() confirm) async {
+    starts++;
+    pinPairing = PinPairing(
+      PinExchange(relay!.origin),
+      delivery!,
+      changed: notifyListeners,
+      confirm: confirm,
+    )..status = 'waiting';
+    notifyListeners();
+  }
+}
+
+class _ReadyDelivery extends PairedDelivery {
+  _ReadyDelivery(MemoryVault vault)
+    : super(vault: vault, confirmation: FakeConfirmation());
+  @override
+  Future<void> initialize() async {}
+  @override
+  String get agentId => 'test-agent';
+  @override
+  String? epoch(String id) => id == agentId ? 'test-epoch' : null;
+}
+
+const configuration = GatewayConfiguration(
+  environment: 'test',
+  revision: 'test',
+  relayUrl: 'https://relay.example.com',
+);
+
+void expectMinimalScreen() {
+  for (final text in [
+    'Request local preview',
+    'Import encrypted request',
+    'Export encrypted result',
+    'Advanced: manual pairing',
+    'Copy Gmail skill',
+    'Copy pairing + Gmail skill',
+    'Saved local rules',
+  ]) {
+    expect(find.text(text), findsNothing);
+  }
+  expect(find.textContaining('fingerprint'), findsNothing);
+  expect(find.textContaining('Release:'), findsNothing);
+  expect(find.textContaining('Environment:'), findsNothing);
+  expect(find.byType(TextField), findsNothing);
+}
+
 void main() {
+  setUpAll(() async {
+    final sdk = Platform.environment['FLUTTER_ROOT'] ?? '../.tools/flutter';
+    final fonts = '$sdk/bin/cache/artifacts/material_fonts';
+    final text = FontLoader('Roboto');
+    for (final font in [
+      'roboto-regular.ttf',
+      'roboto-medium.ttf',
+      'roboto-bold.ttf',
+    ]) {
+      text.addFont(
+        File('$fonts/$font')
+            .readAsBytes()
+            .then((bytes) => ByteData.sublistView(bytes)),
+      );
+    }
+    await text.load();
+    await (FontLoader('MaterialIcons')..addFont(
+          File('$fonts/materialicons-regular.otf')
+              .readAsBytes()
+              .then((bytes) => ByteData.sublistView(bytes)),
+        ))
+        .load();
+  });
   testWidgets(
-    'pairing shows one-time setup and keeps manual pairing advanced',
+    'one pairing button starts pairing and copies the complete setup message',
     (tester) async {
-      await tester.binding.setSurfaceSize(const Size(1000, 2600));
+      await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final now = DateTime.now();
       final vault = MemoryVault();
@@ -31,46 +114,19 @@ void main() {
         confirmation: FakeConfirmation(),
         keyGenerator: () async => Map<String, dynamic>.from(fixture['device']),
       );
-      final controller = GatewayController(
+      final controller = _PairingController(
         session: GmailSession(vault, FakeOAuth(() => now)),
         review: ReviewService(
           vault: vault,
           source: FakeSource(() => now),
           confirmation: FakeConfirmation(),
-          currentEpoch: (_) => null,
+          currentEpoch: delivery.epoch,
         ),
         gmailConfigured: true,
         delivery: delivery,
-        relay: ForegroundRelay('https://relay.example.com'),
+        relay: ForegroundRelay(configuration.relayUrl),
       );
       addTearDown(controller.dispose);
-      await tester.pumpWidget(
-        GatewayApp(
-          configuration: const GatewayConfiguration(
-            environment: 'test',
-            revision: 'test',
-            relayUrl: 'https://relay.example.com',
-          ),
-          controller: controller,
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Pair with Muse'), findsOneWidget);
-      expect(find.text('Advanced: manual pairing'), findsOneWidget);
-      expect(
-        find.widgetWithText(TextField, 'Signed agent pairing offer'),
-        findsNothing,
-      );
-      final exchange = PinExchange('https://relay.example.com');
-      controller.pinPairing = PinPairing(
-        exchange,
-        delivery,
-        changed: () {},
-        confirm: () async => true,
-      )..status = 'waiting';
-      await controller.reload();
-      await tester.pumpAndSettle();
-      expect(find.text('Copy pairing + Gmail skill'), findsOneWidget);
       String? copied;
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
@@ -87,96 +143,132 @@ void main() {
           null,
         ),
       );
-      await tester.tap(find.text('Copy pairing + Gmail skill'));
-      await tester.pumpAndSettle();
-      expect(copied, contains(exchange.setupLine));
-      expect(copied, contains('SKILL: Agent Gateway Gmail'));
-      expect(copied, contains('RELAY_URL: https://relay.example.com'));
-      expect(
-        find.textContaining('Copied. Paste into your trusted'),
-        findsOneWidget,
+      const capture = ValueKey('screen');
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: capture,
+          child: GatewayApp(
+            configuration: configuration,
+            controller: controller,
+          ),
+        ),
       );
+      await tester.pumpAndSettle();
+      expectMinimalScreen();
+      expect(find.text('Pair with Muse'), findsOneWidget);
+      await tester.runAsync(() async {
+        final boundary = tester.renderObject<RenderRepaintBoundary>(
+          find.byKey(capture),
+        );
+        final image = await boundary.toImage(pixelRatio: 2);
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        await File('.dart_tool/minimal-home.png')
+            .writeAsBytes(bytes!.buffer.asUint8List());
+        image.dispose();
+      });
+      await tester.tap(find.text('Pair with Muse'));
+      await tester.pumpAndSettle();
+      expect(controller.starts, 1);
+      expect(copied, contains(controller.pinPairing!.exchange.setupLine));
+      expect(copied, contains('SKILL: Agent Gateway Gmail'));
+      expect(copied, contains('pair --replace'));
+      expect(find.text('Copy setup message'), findsOneWidget);
+      expect(
+        find.textContaining(controller.pinPairing!.exchange.code),
+        findsNothing,
+      );
+      expectMinimalScreen();
+      await tester.tap(find.text('Copy setup message'));
+      await tester.pumpAndSettle();
+      expect(controller.starts, 1);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       await tester.pump();
-      expect(controller.pinPairing, isNotNull);
-      expect(delivery.agentId, isNull);
+      expect(find.text('Copy setup message'), findsNothing);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
-      expect(
-        find.text(
-          '${exchange.code.substring(0, 4)} ${exchange.code.substring(4)}',
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Copy setup message'), findsOneWidget);
       await tester.tap(find.text('Cancel pairing'));
       await tester.pumpAndSettle();
-      expect(find.text('Copy pairing + Gmail skill'), findsNothing);
       expect(controller.pinPairing, isNull);
+      expect(find.text('Pair with Muse'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
   testWidgets(
-    'Gmail UI connects, requires fetch consent, shows filtered preview and allows once',
+    'remote requests retain access and disclosure approval but completed history is hidden',
     (tester) async {
-      await tester.binding.setSurfaceSize(const Size(1000, 2600));
+      await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final now = DateTime.now().toUtc();
       final vault = MemoryVault();
+      final now = DateTime.now().toUtc();
+      final delivery = _ReadyDelivery(vault);
       final source = FakeSource(() => now);
-      final session = GmailSession(vault, FakeOAuth(() => now));
       final review = ReviewService(
         vault: vault,
         source: source,
         confirmation: FakeConfirmation(),
-        currentEpoch: (id) => id == 'device-owner' ? 'local-preview-v1' : null,
+        currentEpoch: delivery.epoch,
       );
       final controller = GatewayController(
-        session: session,
+        session: GmailSession(vault, FakeOAuth(() => now)),
         review: review,
         gmailConfigured: true,
+        delivery: delivery,
       );
+      await controller.initialize();
+      await controller.connect();
       addTearDown(controller.dispose);
+      GmailRequest request(String id, String purpose) => GmailRequest(
+        id: id,
+        agentId: delivery.agentId,
+        pairingEpoch: delivery.epoch(delivery.agentId)!,
+        query: 'subject:invoice',
+        purpose: purpose,
+        fields: {'id', 'date', 'subject'},
+        since: now.subtract(const Duration(days: 7)),
+        until: now,
+        maxResults: 1,
+        issuedAt: now,
+        expiresAt: now.add(const Duration(minutes: 5)),
+      );
+      await review.begin(request('remote-one', 'Find my invoice'));
       await tester.pumpWidget(
-        GatewayApp(
-          configuration: const GatewayConfiguration(
-            environment: 'test',
-            revision: 'test',
-            relayUrl: '',
-          ),
-          controller: controller,
-        ),
+        GatewayApp(configuration: configuration, controller: controller),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Connect Gmail'));
-      await tester.pumpAndSettle();
-      expect(find.text('Gmail: connected'), findsOneWidget);
-      await tester.enterText(find.byType(TextField).at(0), 'subject:invoice');
-      await tester.enterText(find.byType(TextField).at(1), 'Find receipt');
-      await tester.tap(find.text('Request local preview'));
-      await tester.pumpAndSettle();
+      expectMinimalScreen();
       expect(source.fetches, 0);
-      expect(find.text('Allow Gmail access'), findsOneWidget);
+      await tester.ensureVisible(find.text('Allow Gmail access'));
       await tester.tap(find.text('Allow Gmail access'));
       await tester.pumpAndSettle();
       expect(source.fetches, 1);
       expect(find.textContaining('Invoice for [redacted]'), findsOneWidget);
       expect(find.textContaining('person@example.com'), findsNothing);
+      await tester.ensureVisible(find.text('Allow once'));
       await tester.tap(find.text('Allow once'));
       await tester.pumpAndSettle();
-      expect(
-        find.text(
-          'Approved locally. No data has been transmitted to an agent.',
-        ),
-        findsOneWidget,
-      );
+      expect((await review.entries()).single.state, ReviewState.allowed);
+      expect(find.text('Find my invoice'), findsNothing);
+      expect(find.textContaining('Invoice for [redacted]'), findsNothing);
+      await review.begin(request('remote-two', 'Another request'));
+      await controller.reload();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Deny'));
+      await tester.tap(find.text('Deny'));
+      await tester.pumpAndSettle();
+      expect(source.fetches, 1);
+      expect(find.text('Another request'), findsNothing);
+      expect(controller.pendingEntries, isEmpty);
+      await tester.ensureVisible(find.text('Disconnect Gmail'));
       await tester.tap(find.text('Disconnect Gmail'));
       await tester.pumpAndSettle();
-      expect(find.text('Gmail: not connected'), findsOneWidget);
-      expect(controller.entries, isEmpty);
+      expect(controller.connected, isFalse);
+      expectMinimalScreen();
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );

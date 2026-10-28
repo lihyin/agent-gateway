@@ -30,8 +30,20 @@ class _GatewayAppState extends State<GatewayApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
+    debugShowCheckedModeBanner: false,
     title: 'Agent Gateway',
-    theme: ThemeData(colorSchemeSeed: const Color(0xFF245C4B)),
+    theme: ThemeData(
+      colorSchemeSeed: const Color(0xFF245C4B),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        color: Colors.white,
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFE4E9E6)),
+        ),
+      ),
+    ),
     home: GatewayHome(
       configuration: widget.configuration,
       controller: _controller,

@@ -87,7 +87,8 @@ void main() {
     addTearDown(controller.dispose);
     await controller.initialize();
     await controller.connect();
-    await controller.pair(f['offer'], f['fingerprint']);
+    await delivery.pair(f['offer'], f['fingerprint']);
+    await controller.reload();
     await controller.enableRelay(true);
     expect(controller.error, isNull);
     final agent = delivery.agentId!;
@@ -112,7 +113,8 @@ void main() {
     expect(controller.relayEnabled, isFalse);
 
     await controller.connect();
-    await controller.pair(f['offer'], f['fingerprint']);
+    await delivery.pair(f['offer'], f['fingerprint']);
+    await controller.reload();
     final secondEpoch = delivery.epoch(delivery.agentId!)!;
     expect(secondEpoch, isNot(firstEpoch));
     expect(controller.pairingComplete, isTrue);

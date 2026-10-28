@@ -1,6 +1,6 @@
 # Pair with Muse using a one-time code
 
-The iPhone starts pairing, shows an eight-digit code, and supplies one setup
+The iPhone starts pairing and copies one complete setup
 message for your trusted Muse chat. Muse and the phone exchange signed pairing
 material through the existing Cloudflare relay. No additional server, public
 hostname, callback service, or always-on PC is required.
@@ -10,8 +10,9 @@ hostname, callback service, or always-on PC is required.
 1. Install matching versions of the relay, Muse client and iPhone app. The relay
    needs the `PAIRINGS` binding, `v2-pairing` migration, and exact `RELAY_ORIGIN`.
    Pairing does not require APNs, Gmail, or the notification transport pins.
-2. On an unpaired iPhone, tap **Pair with Muse**. Keep the app open.
-3. Tap **Copy pairing + Gmail skill** and paste it into your trusted Muse conversation.
+2. On an unpaired iPhone, tap **Pair with Muse**. This starts pairing and copies
+   the setup message in one action.
+3. Paste the copied message into your trusted Muse conversation.
    One message includes the setup line and a reusable Gmail SKILL bound to this
    app's relay origin. Return to Agent Gateway to confirm the pairing. Muse is
    instructed to discard the temporary setup line rather than save it in its skill.
@@ -48,7 +49,7 @@ approvals still expire within five minutes; only the code-pairing window changed
 ## Enable notification delivery separately
 
 Pairing registers device-signed public transport identities in PairingRegistry.
-Enable **Relay notifications** on the phone once and grant iOS permission.
+Enable **Notifications** on the phone once and grant iOS permission.
 The relay stores the encrypted push destination and selects it using the verified
 pairing. No per-user secret edit, route copying or daily refresh is required.
 The original setup message already contains the reusable Gmail skill.
@@ -68,10 +69,16 @@ Default `pair` still refuses to overwrite an existing pair without explicit inte
 
 Gmail connection is separate from pairing: disconnect/reconnect preserves the
 existing pair. After phone unpairing and a new pairing, reconnect Gmail if needed
-and explicitly enable **Relay notifications** for that new pair. The app shows
+and explicitly enable **Notifications** for that new pair. The app shows
 Gmail, Muse pairing and notification state and registers the new epoch's push
 destination automatically. A rejected old relay pair is reported to CLI/MCP as
 `relay_pairing_rejected`, not an indefinitely pending phone approval.
+
+The home screen shows only connection controls and current requests needing
+approval. Completed requests, fingerprints, transport details, local preview
+tools and manual encrypted import/export are absent. Access and disclosure
+approval remain separate. Protected protocol state needed for delivery retries
+and replay prevention remains internal; there is no request-history screen.
 
 - Wrong code, expiry, network loss or relay restart ends the attempt. Moving to the
   background can interrupt the socket on iOS; brief app switching may work, but confirmation waits for foreground resume. If interrupted, generate a new code.

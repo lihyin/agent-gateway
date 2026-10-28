@@ -37,22 +37,18 @@ void main() {
         GatewayApp(configuration: configuration, controller: controller),
       );
       expect(find.text('Agent Gateway'), findsOneWidget);
-      expect(find.text('Release: tested-revision'), findsOneWidget);
-      expect(
-        find.textContaining('Enable relay delivery for request notifications'),
-        findsOneWidget,
-      );
+      expect(find.text('Release: tested-revision'), findsNothing);
       await tester.pumpAndSettle();
       expect(
         tester
-            .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Connect Gmail'),
+            .widget<TextButton>(
+              find.widgetWithText(TextButton, 'Connect Gmail'),
             )
             .onPressed,
         isNull,
       );
       expect(
-        find.textContaining('Google iOS client configuration'),
+        find.textContaining('Gmail connection is not available'),
         findsOneWidget,
       );
       await tester.pumpWidget(const SizedBox.shrink());
