@@ -27,6 +27,51 @@ const f = JSON.parse(
     "utf8",
   ),
 );
+
+test("MCP exposes a rejected relay pairing instead of indefinitely returning pending", async () => {
+  const bridge = new Bridge(
+    {
+      identity: f.agent,
+      pairing: {
+        identity: publicIdentity(f.device),
+        epoch: f.context.pairingEpoch,
+      },
+      jobs: {},
+    },
+    async () => {},
+    () => 100,
+  );
+  const job = await bridge.request(f.payload);
+  let failure: string | undefined = "relay_pairing_rejected";
+  const server = createMcpServer(bridge, true, undefined, () => failure);
+  const client = new Client({ name: "test-client", version: "1.0.0" });
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await server.connect(a);
+  await client.connect(b);
+  try {
+    const rejected = await client.callTool({
+      name: "gateway_request_status",
+      arguments: { requestId: job.requestId },
+    });
+    assert.equal(rejected.isError, true);
+    assert.deepEqual(
+      JSON.parse((rejected.content as { text: string }[])[0].text),
+      { error: "relay_pairing_rejected" },
+    );
+    failure = undefined;
+    const pending = await client.callTool({
+      name: "gateway_request_status",
+      arguments: { requestId: job.requestId },
+    });
+    assert.deepEqual(pending.structuredContent, {
+      status: "pending_device_review",
+      requestId: job.requestId,
+    });
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});
 test("MCP client lists tools, creates idempotent pending review, and receives only authenticated results", async () => {
   let now = 100;
   const bridge = new Bridge(

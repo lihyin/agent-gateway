@@ -56,13 +56,32 @@ See [relay setup](remote-delivery.md). Pairing itself sends no push.
 
 ## Recovery
 
+Ordinary users can unpair/disconnect and reconnect from the phone. Phone unpairing
+revokes relay access but cannot delete the private state file in Muse's runtime.
+A fresh phone setup message explicitly instructs the updated client to run
+`pair --replace`. Muse stops the old MCP process and runs this itself; the user
+does not need terminal commands, state-file deletion or relay configuration.
+The old local pair remains until the new SRP exchange, device-signed receipt and
+phone confirmation succeed. Failed/cancelled attempts retain it; successful
+replacement preserves the agent identity and removes previous-epoch jobs/results.
+Default `pair` still refuses to overwrite an existing pair without explicit intent.
+
+Gmail connection is separate from pairing: disconnect/reconnect preserves the
+existing pair. After phone unpairing and a new pairing, reconnect Gmail if needed
+and explicitly enable **Relay notifications** for that new pair. The app shows
+Gmail, Muse pairing and notification state and registers the new epoch's push
+destination automatically. A rejected old relay pair is reported to CLI/MCP as
+`relay_pairing_rejected`, not an indefinitely pending phone approval.
+
 - Wrong code, expiry, network loss or relay restart ends the attempt. Moving to the
   background can interrupt the socket on iOS; brief app switching may work, but confirmation waits for foreground resume. If interrupted, generate a new code.
 - Cancellation or rejected device authentication grants no new pairing. A late
   authentication result cannot commit after session cancellation or expiry.
 - An interrupted final receipt/acknowledgment can leave one endpoint paired.
-  Check both endpoints; if incomplete, unpair the phone and run CLI `unpair`, then
-  start again. This is explicit recovery, not automatic rollback of a saved identity.
+  Unpair the phone and copy a fresh setup message; the updated Muse client uses
+  `pair --replace` to recover. This is explicit recovery, not automatic rollback
+  of a saved identity. Older clients can recover with CLI `unpair` before `pair`;
+  these commands are run by Muse in its runtime, not by the phone user.
 - Existing identities and the private agent state file are preserved. Do not
   delete state files or generate replacement keys just to retry pairing.
 - **Advanced: manual pairing** retains the full-fingerprint fallback. Cancel the

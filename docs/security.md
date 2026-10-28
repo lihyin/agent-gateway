@@ -39,6 +39,14 @@ quotas and physical-device acceptance remain operational checks. No audit is cla
 
 ## Relay-only transport
 
+Re-pairing is explicit endpoint intent, not a response to an untrusted relay error.
+The setup message authorizes the agent client's `pair --replace` flow. Existing
+local trust remains pinned until the new SRP exchange and device-signed receipt
+pass verification and the phone confirms/authenticates. Failed/cancelled attempts
+cannot replace the old pair. Success preserves agent keys and clears old-epoch
+jobs/results. An HTTP 401 reports `relay_pairing_rejected` to CLI/MCP; it never
+silently deletes local keys, unpairs, grants source access or approves a new device.
+
 PairingRegistry is the sole transport authority for all users; there is no
 single-pair secret fallback. The phone signs 30-second `agw+register` proofs
 binding its APNs token, relay audience, both IDs, epoch and millisecond `updatedAt`.

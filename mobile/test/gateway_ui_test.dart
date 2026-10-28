@@ -173,7 +173,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      await tester.tap(find.text('Disconnect and revoke'));
+      await tester.tap(find.text('Disconnect Gmail'));
       await tester.pumpAndSettle();
       expect(find.text('Gmail: not connected'), findsOneWidget);
       expect(controller.entries, isEmpty);

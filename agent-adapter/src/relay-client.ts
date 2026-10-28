@@ -66,6 +66,8 @@ export async function relayRequest(
           response.resume();
           if ([429, 502, 503, 504].includes(response.statusCode ?? 0))
             finish("retry");
+          else if (response.statusCode === 401)
+            finish("retry", new Error("relay_pairing_rejected"));
           else finish("retry", new Error("relay_configuration_required"));
         });
         socket.on("error", () => finish("retry"));

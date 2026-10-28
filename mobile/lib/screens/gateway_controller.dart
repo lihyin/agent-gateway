@@ -79,6 +79,9 @@ class GatewayController extends ChangeNotifier {
   bool foreground = true;
   bool get relayEnabled =>
       relay != null && (delivery?.relayEnabled(relay!.origin) ?? false);
+  bool get pairingComplete =>
+      delivery?.agentId != null &&
+      (pinPairing == null || pinPairing!.status == 'paired');
   String? exported;
   String? get museSkill => relay == null || delivery?.agentId == null
       ? null
@@ -163,6 +166,7 @@ class GatewayController extends ChangeNotifier {
     await session.connect();
     connected = true;
     await _reload();
+    await _sync();
   });
   Future<void> disconnect() => _run(() async {
     connected = false;

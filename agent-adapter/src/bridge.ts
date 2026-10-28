@@ -74,9 +74,12 @@ export class Bridge {
       throw new Error("storage_unavailable");
     }
   }
-  offer(): Promise<{ offer: string; fingerprint: string }> {
+  offer(
+    replaceExisting = false,
+  ): Promise<{ offer: string; fingerprint: string }> {
     return this.run(async () => {
-      if (this.state.pairing) throw new Error("already_paired");
+      if (this.state.pairing && !replaceExisting)
+        throw new Error("already_paired");
       this.state.offer = await pairingOffer(this.state.identity, this.clock());
       await this.persist();
       return {
@@ -89,9 +92,14 @@ export class Bridge {
     receipt: string,
     expectedDeviceFingerprint: string,
     stillAuthorized?: () => boolean,
+    replaceExisting = false,
   ): Promise<void> {
     return this.run(async () => {
-      if (this.state.pairing || !this.state.offer || receipt.length > 5000)
+      if (
+        (this.state.pairing && !replaceExisting) ||
+        !this.state.offer ||
+        receipt.length > 5000
+      )
         throw new Error("invalid_pairing");
       const unsafe = JSON.parse(
         Buffer.from(receipt.split(".")[1] ?? "", "base64url").toString(),
@@ -169,6 +177,9 @@ export class Bridge {
       if (stillAuthorized && !stillAuthorized())
         throw new Error("invalid_pairing");
       this.state.pairing = { identity, epoch: verified.epoch as string };
+      // A new authenticated pairing must never reuse requests/results from the
+      // previous device or epoch. The old pairing remains intact until here.
+      this.state.jobs = {};
       delete this.state.offer;
       await this.persist();
     });

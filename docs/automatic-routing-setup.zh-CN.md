@@ -198,6 +198,23 @@ iOS 不保证后台运行；若系统更换 token，可能需要打开一次 App
 
 ## 7. 失败时从哪里查
 
+### 用户解绑和重新连接
+
+Gmail 连接、Muse 配对和通知开关是独立状态。只断开 Gmail 后重新连接，不需要
+重新配对。若在手机点击了 **Unpair agent**，再次连接时按以下步骤操作：
+
+1. 连接 Gmail。
+2. 点击 **Pair with Muse**，生成并复制新的完整 setup message 到可信 Muse 会话。
+3. Muse 按新消息更新客户端、停止旧 MCP，并执行明确的重新配对流程。
+   手机解绑不会删除 Muse 环境内的旧状态；新消息中的 `pair --replace` 负责安全替换。
+4. 在手机确认并完成认证，然后重新开启 **Relay notifications**。
+5. 发起一条新的 Gmail 请求验证通知。旧请求不会跨配对 epoch 继续使用。
+
+普通用户不需要删除状态文件、运行终端命令或修改 Cloudflare 配置。Muse 只有在
+新验证码和手机确认均成功后才替换旧本地配对；失败时保留旧状态。
+已安装旧版 App/客户端时，可让 Muse 先用原状态路径执行 CLI `unpair`，再按新的
+手机 setup message 配对。这是代理执行的恢复操作，不要求用户自行操作终端。
+
 - **缺少 Worker secret**：发布的预检步骤会列出缺失的名称，分别补齐两环境。
 - **Gmail 登录失败**：核对 iOS client ID、bundle ID、Google 测试用户，以及 App
   构建时的 `GOOGLE_IOS_CLIENT_ID`。

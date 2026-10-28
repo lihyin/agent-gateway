@@ -8,6 +8,9 @@ void main() {
     final message = musePairingMessage(origin: origin, setupLine: setup);
     expect(setup.allMatches(message), hasLength(1));
     expect(message, contains('standard input'));
+    expect(message, contains('pair --replace'));
+    expect(message, contains('previous local pairing is replaced only after'));
+    expect(message, contains('Stop any MCP process'));
     expect(message, contains('RELAY_URL: $origin'));
     expect(message, contains('SKILL: Agent Gateway Gmail (v1)'));
     expect(message, contains('No route needs to be copied'));

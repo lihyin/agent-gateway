@@ -12,6 +12,7 @@ const knownErrors = new Set([
   "replay",
   "unknown_request",
   "storage_unavailable",
+  "relay_pairing_rejected",
 ]);
 async function response(task: () => Promise<unknown>) {
   try {
@@ -37,6 +38,7 @@ export function createMcpServer(
   bridge: Bridge,
   automatic = false,
   onRequest?: (id: string) => void,
+  transportError?: (id: string) => string | undefined,
 ): McpServer {
   const server = new McpServer(
     { name: "agent-gateway", version: "1.0.0" },
@@ -105,8 +107,11 @@ export function createMcpServer(
     async ({ requestId }) =>
       response(async () => {
         const result = await bridge.status(requestId);
-        if (automatic && result.status === "pending_device_review")
+        if (automatic && result.status === "pending_device_review") {
+          const error = transportError?.(requestId);
+          if (error) throw new Error(error);
           return { status: result.status, requestId };
+        }
         return result;
       }),
   );

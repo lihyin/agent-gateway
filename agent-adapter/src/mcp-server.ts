@@ -11,20 +11,37 @@ async function main() {
   const origin = process.env.RELAY_URL;
   const controller = new AbortController();
   const active = new Map<string, Promise<unknown>>();
-  const server = createMcpServer(bridge, Boolean(origin), (id) => {
-    if (!origin || active.has(id)) return;
-    const task = relayRequest(bridge, id, origin, controller.signal)
-      .catch(() => {
-        if (!controller.signal.aborted)
-          process.stderr.write(
-            "Relay delivery incomplete; check configuration and retry the same request before expiry.\n",
-          );
-      })
-      .finally(() => {
-        active.delete(id);
-      });
-    active.set(id, task);
-  });
+  const errors = new Map<string, string>();
+  const server = createMcpServer(
+    bridge,
+    Boolean(origin),
+    (id) => {
+      if (!origin || active.has(id)) return;
+      for (const savedId of errors.keys())
+        if (!bridge.state.jobs[savedId]) errors.delete(savedId);
+      errors.delete(id);
+      const task = relayRequest(bridge, id, origin, controller.signal)
+        .catch((error) => {
+          if (
+            error instanceof Error &&
+            error.message === "relay_pairing_rejected"
+          )
+            errors.set(id, error.message);
+          if (!controller.signal.aborted)
+            process.stderr.write(
+              error instanceof Error &&
+                error.message === "relay_pairing_rejected"
+                ? "The relay rejected the saved pairing. Ask the user for a fresh iPhone setup message, stop this MCP process, then use pair --replace and enable phone notifications.\n"
+                : "Relay delivery incomplete; check configuration and retry the same request before expiry.\n",
+            );
+        })
+        .finally(() => {
+          active.delete(id);
+        });
+      active.set(id, task);
+    },
+    (id) => errors.get(id),
+  );
   let closed = false;
   const shutdown = async () => {
     if (closed) return;

@@ -9,6 +9,8 @@ import {
   identityId,
   publicIdentity,
   signObject,
+  verifyObject,
+  canonical,
   type Context,
 } from "../src/crypto.js";
 
@@ -64,6 +66,71 @@ test("encrypted request uses pinned recipient and validated payload", async () =
   ])
     await assert.rejects(bridge.request(p));
   await assert.rejects(setup(false).request(f.payload));
+});
+
+test("explicit re-pairing retains the old pair until authenticated acceptance and clears old jobs", async () => {
+  const bridge = setup();
+  const oldIdentity = structuredClone(bridge.state.identity);
+  const oldPair = structuredClone(bridge.state.pairing);
+  const job = await bridge.request(f.payload);
+  await assert.rejects(bridge.offer(), /already_paired/);
+  const { offer } = await bridge.offer(true);
+  assert.deepEqual(bridge.state.pairing, oldPair);
+  assert.ok(bridge.state.jobs[job.requestId]);
+  const value = await verifyObject(
+    publicIdentity(f.agent).signing,
+    offer,
+    "agw+pairing",
+  );
+  const { createHash, randomUUID } = await import("node:crypto");
+  const epoch = randomUUID();
+  const receipt = await signObject(
+    f.device,
+    {
+      version: 1,
+      kind: "accept",
+      nonce: value.nonce,
+      offerDigest: createHash("sha256").update(canonical(offer)).digest("hex"),
+      agentId: await identityId(f.agent),
+      identity: publicIdentity(f.device),
+      epoch,
+      issuedAt: now,
+      expiresAt: value.expiresAt,
+    },
+    "agw+pairing",
+  );
+  await assert.rejects(
+    bridge.accept(receipt, fingerprint(publicIdentity(f.device))),
+  );
+  await assert.rejects(bridge.accept(receipt, "0".repeat(64), undefined, true));
+  await assert.rejects(
+    bridge.accept(
+      receipt,
+      fingerprint(publicIdentity(f.device)),
+      () => false,
+      true,
+    ),
+  );
+  assert.deepEqual(bridge.state.pairing, oldPair);
+  assert.ok(bridge.state.jobs[job.requestId]);
+  await bridge.accept(
+    receipt,
+    fingerprint(publicIdentity(f.device)),
+    () => true,
+    true,
+  );
+  assert.equal(bridge.state.pairing?.epoch, epoch);
+  assert.deepEqual(bridge.state.identity, oldIdentity);
+  assert.deepEqual(bridge.state.jobs, {});
+  await assert.rejects(bridge.status(job.requestId), /unknown_request/);
+  await assert.rejects(
+    bridge.accept(
+      receipt,
+      fingerprint(publicIdentity(f.device)),
+      undefined,
+      true,
+    ),
+  );
 });
 test("results bind request identity, direction, pairing and signature", async () => {
   const bridge = setup();

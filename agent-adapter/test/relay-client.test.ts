@@ -135,3 +135,52 @@ test("cancelled outbound work cannot become a completed disclosure", async () =>
     "pending_device_review",
   );
 });
+
+test("revoked relay pairing fails promptly without deleting local state or claiming review is pending", async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const bridge = new Bridge(
+    {
+      identity: f.agent,
+      pairing: {
+        identity: publicIdentity(f.device),
+        epoch: f.context.pairingEpoch,
+      },
+      jobs: {},
+    },
+    async () => {},
+    () => now,
+  );
+  const job = await bridge.request({
+    ...f.payload,
+    since: now - 86400,
+    until: now,
+  });
+  const server = createServer();
+  let connections = 0;
+  server.on("upgrade", (_request, socket) => {
+    connections++;
+    socket.end(
+      "HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n",
+    );
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const address = server.address() as { port: number };
+    await assert.rejects(
+      relayRequest(
+        bridge,
+        job.requestId,
+        "https://relay.example.com",
+        undefined,
+        (_url, options) =>
+          new WebSocket(`ws://127.0.0.1:${address.port}`, options),
+      ),
+      /relay_pairing_rejected/,
+    );
+    assert.equal(connections, 1);
+    assert.equal(bridge.state.pairing?.epoch, f.context.pairingEpoch);
+    assert.ok(bridge.state.jobs[job.requestId]);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});

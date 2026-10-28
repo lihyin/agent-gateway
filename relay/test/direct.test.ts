@@ -372,6 +372,32 @@ test("destinations survive a day, rotate without agent setup, and reject replay 
     await registryPair(s.env, { deviceId: pair.deviceId }),
     replacement,
   );
+  // After a user re-pairs, a fresh device registration restores delivery for
+  // the new epoch while the old request remains rejected.
+  await issueRoute(
+    await signObject(
+      f.device,
+      {
+        ...rotated,
+        pairingEpoch: replacement.pairingEpoch,
+        updatedAt: future * 1000 + 1,
+      },
+      "agw+register",
+    ),
+    s.env,
+    future,
+  );
+  assert.equal(
+    (
+      await verifyRequest(
+        await makeRequest(future, { pairingEpoch: replacement.pairingEpoch }),
+        s.env,
+        future,
+      )
+    ).pushToken,
+    rotated.pushToken,
+  );
+  await assert.rejects(verifyRequest(await makeRequest(future), s.env, future));
 });
 
 test("signed disable and unpair revoke routing; delivery attempts are limited durably", async (t) => {

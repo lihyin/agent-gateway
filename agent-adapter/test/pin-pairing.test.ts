@@ -59,125 +59,141 @@ test("pairing accepts the thirty-minute boundary and rejects longer or expired c
   );
 });
 
-test(
-  "outbound Muse pairing waits for authenticated receipt before saving paired state",
-  { timeout: 15000 },
-  async () => {
-    const fixture = JSON.parse(
-      readFileSync(
-        new URL("../../protocol/fixtures/pairing.json", import.meta.url),
-        "utf8",
-      ),
-    );
-    const bridge = new Bridge(
-      { identity: fixture.agent, jobs: {} },
-      async () => {},
-    );
-    const server = new WebSocketServer({ port: 0, host: "127.0.0.1" });
-    await new Promise<void>((resolve) => server.once("listening", resolve));
-    let peerError: unknown;
-    let confirmed!: () => void;
-    const confirmation = new Promise<void>((resolve) => {
-      confirmed = resolve;
-    });
-    server.on("connection", (socket) => {
-      const params = { ...SRP.params[2048], hash: "sha256" };
-      const salt = randomBytes(32);
-      const verifier = SRP.computeVerifier(
-        params,
-        salt,
-        Buffer.from(`agw-pin-v1:${setup.origin}:${setup.session}`),
-        Buffer.from(setup.code),
+for (const replaceExisting of [false, true])
+  test(
+    `outbound Muse pairing waits for authenticated receipt before saving paired state; replace=${replaceExisting}`,
+    { timeout: 15000 },
+    async () => {
+      const fixture = JSON.parse(
+        readFileSync(
+          new URL("../../protocol/fixtures/pairing.json", import.meta.url),
+          "utf8",
+        ),
       );
-      const phone = new SrpServer(params, verifier, randomBytes(32));
-      let key: Buffer,
-        stage = "proof";
-      socket.send(
-        JSON.stringify({
-          kind: "challenge",
-          salt: salt.toString("hex"),
-          B: phone.computeB().toString("hex"),
-          expiresAt: setup.expiresAt,
-        }),
+      const bridge = new Bridge(
+        {
+          identity: fixture.agent,
+          jobs: {},
+          ...(replaceExisting
+            ? {
+                pairing: {
+                  identity: publicIdentity(fixture.device),
+                  epoch: fixture.context.requestId,
+                },
+              }
+            : {}),
+        },
+        async () => {},
       );
-      socket.on("message", async (raw) => {
-        try {
-          const frame = JSON.parse(raw.toString());
-          if (stage === "proof") {
-            phone.setA(Buffer.from(frame.A, "hex"));
-            phone.checkM1(Buffer.from(frame.M1, "hex"));
-            key = phone.computeK();
-            stage = "offer";
-            socket.send(
-              JSON.stringify({ jwe: await sealPairing(key, setup, "ready") }),
-            );
-          } else if (stage === "offer") {
-            assert.equal(bridge.state.pairing, undefined);
-            const value = await openPairing(key, setup, frame.jwe, "offer");
-            const offer = await verifyObject(
-              publicIdentity(fixture.agent).signing,
-              value.offer as string,
-              "agw+pairing",
-            );
-            const receipt = await signObject(
-              fixture.device,
-              {
-                version: 1,
-                kind: "accept",
-                nonce: offer.nonce,
-                offerDigest: createHash("sha256")
-                  .update(canonical(value.offer))
-                  .digest("hex"),
-                agentId: await identityId(fixture.agent),
-                identity: publicIdentity(fixture.device),
-                epoch: fixture.context.pairingEpoch,
-                issuedAt: Math.floor(Date.now() / 1000),
-                expiresAt: offer.expiresAt,
-              },
-              "agw+pairing",
-            );
-            stage = "complete";
-            socket.send(
-              JSON.stringify({
-                jwe: await sealPairing(key, setup, "receipt", {
-                  receipt,
-                  fingerprint: fingerprint(publicIdentity(fixture.device)),
-                }),
-              }),
-            );
-          } else {
-            await openPairing(key, setup, frame.jwe, "complete");
-            assert.ok(bridge.state.pairing);
-            confirmed();
-          }
-        } catch (error) {
-          peerError = error;
-          confirmed();
-          socket.close();
-        }
+      const server = new WebSocketServer({ port: 0, host: "127.0.0.1" });
+      await new Promise<void>((resolve) => server.once("listening", resolve));
+      let peerError: unknown;
+      let confirmed!: () => void;
+      const confirmation = new Promise<void>((resolve) => {
+        confirmed = resolve;
       });
-    });
-    try {
-      const address = server.address() as { port: number };
-      await pairWithCode(
-        bridge,
-        setup,
-        undefined,
-        (_url, options) =>
-          new WebSocket(`ws://127.0.0.1:${address.port}`, options),
-      );
-      await confirmation;
-      assert.equal(peerError, undefined);
-      assert.deepEqual(
-        bridge.state.pairing?.identity,
-        publicIdentity(fixture.device),
-      );
-    } finally {
-      for (const socket of server.clients) socket.terminate();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-    }
-  },
-);
+      server.on("connection", (socket) => {
+        const params = { ...SRP.params[2048], hash: "sha256" };
+        const salt = randomBytes(32);
+        const verifier = SRP.computeVerifier(
+          params,
+          salt,
+          Buffer.from(`agw-pin-v1:${setup.origin}:${setup.session}`),
+          Buffer.from(setup.code),
+        );
+        const phone = new SrpServer(params, verifier, randomBytes(32));
+        let key: Buffer,
+          stage = "proof";
+        socket.send(
+          JSON.stringify({
+            kind: "challenge",
+            salt: salt.toString("hex"),
+            B: phone.computeB().toString("hex"),
+            expiresAt: setup.expiresAt,
+          }),
+        );
+        socket.on("message", async (raw) => {
+          try {
+            const frame = JSON.parse(raw.toString());
+            if (stage === "proof") {
+              phone.setA(Buffer.from(frame.A, "hex"));
+              phone.checkM1(Buffer.from(frame.M1, "hex"));
+              key = phone.computeK();
+              stage = "offer";
+              socket.send(
+                JSON.stringify({ jwe: await sealPairing(key, setup, "ready") }),
+              );
+            } else if (stage === "offer") {
+              assert.equal(
+                bridge.state.pairing?.epoch,
+                replaceExisting ? fixture.context.requestId : undefined,
+              );
+              const value = await openPairing(key, setup, frame.jwe, "offer");
+              const offer = await verifyObject(
+                publicIdentity(fixture.agent).signing,
+                value.offer as string,
+                "agw+pairing",
+              );
+              const receipt = await signObject(
+                fixture.device,
+                {
+                  version: 1,
+                  kind: "accept",
+                  nonce: offer.nonce,
+                  offerDigest: createHash("sha256")
+                    .update(canonical(value.offer))
+                    .digest("hex"),
+                  agentId: await identityId(fixture.agent),
+                  identity: publicIdentity(fixture.device),
+                  epoch: fixture.context.pairingEpoch,
+                  issuedAt: Math.floor(Date.now() / 1000),
+                  expiresAt: offer.expiresAt,
+                },
+                "agw+pairing",
+              );
+              stage = "complete";
+              socket.send(
+                JSON.stringify({
+                  jwe: await sealPairing(key, setup, "receipt", {
+                    receipt,
+                    fingerprint: fingerprint(publicIdentity(fixture.device)),
+                  }),
+                }),
+              );
+            } else {
+              await openPairing(key, setup, frame.jwe, "complete");
+              assert.ok(bridge.state.pairing);
+              confirmed();
+            }
+          } catch (error) {
+            peerError = error;
+            confirmed();
+            socket.close();
+          }
+        });
+      });
+      try {
+        const address = server.address() as { port: number };
+        await pairWithCode(
+          bridge,
+          setup,
+          undefined,
+          (_url, options) =>
+            new WebSocket(`ws://127.0.0.1:${address.port}`, options),
+          { replaceExisting },
+        );
+        await confirmation;
+        assert.equal(peerError, undefined);
+        assert.deepEqual(
+          bridge.state.pairing?.identity,
+          publicIdentity(fixture.device),
+        );
+      } finally {
+        for (const socket of server.clients) socket.terminate();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
+    },
+  );
 test("SRP authenticates one-time code without transmitting it; wrong code and zero public value fail", () => {
   const salt = randomBytes(32);
   const params = { ...SRP.params[2048], hash: "sha256" };

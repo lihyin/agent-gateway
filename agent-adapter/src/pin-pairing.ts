@@ -126,10 +126,12 @@ export async function pairWithCode(
     url,
     options,
   ) => new WebSocket(url, options),
+  options: { replaceExisting?: boolean } = {},
 ): Promise<void> {
   if (signal?.aborted || Date.now() >= setup.expiresAt * 1000)
     throw new Error("pairing_cancelled_or_expired");
-  if (bridge.state.pairing) throw new Error("already_paired");
+  if (bridge.state.pairing && !options.replaceExisting)
+    throw new Error("already_paired");
   const socket = connect(
     `${setup.origin.replace("https:", "wss:")}/v1/pairing/${setup.session}/agent`,
     {
@@ -197,7 +199,7 @@ export async function pairWithCode(
             );
           } else if (stage === "ready") {
             await openPairing(key!, setup, frame.jwe, "ready");
-            const { offer } = await bridge.offer();
+            const { offer } = await bridge.offer(options.replaceExisting);
             stage = "receipt";
             socket.send(
               JSON.stringify({
@@ -219,6 +221,7 @@ export async function pairWithCode(
                 !done &&
                 !signal?.aborted &&
                 Date.now() < setup.expiresAt * 1000,
+              options.replaceExisting,
             );
             socket.send(
               JSON.stringify({

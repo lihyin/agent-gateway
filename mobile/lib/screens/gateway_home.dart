@@ -425,7 +425,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                           onPressed: c.busy || !c.ready || !c.connected
                               ? null
                               : c.disconnect,
-                          child: const Text('Disconnect and revoke'),
+                          child: const Text('Disconnect Gmail'),
                         ),
                       ],
                     ),
@@ -445,7 +445,21 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                     if (c.delivery != null) ...[
                       const SizedBox(height: 24),
                       const Text('Authenticated agent pairing'),
+                      if (!c.connected && c.pairingComplete)
+                        const Text(
+                          'Gmail is disconnected. Reconnect Gmail to use the existing Muse pairing; pairing again is not required.',
+                        ),
+                      Text(
+                        'Muse: ${c.delivery!.agentId == null
+                            ? 'not paired'
+                            : c.pairingComplete
+                            ? 'paired'
+                            : 'pairing not complete'}',
+                      ),
                       if (c.delivery!.agentId == null) ...[
+                        const Text(
+                          'Pair with Muse using a fresh setup message. It also handles an old pairing remembered by Muse; you do not need to reset files or change server settings.',
+                        ),
                         _pinPairing(c),
                         ExpansionTile(
                           title: const Text('Advanced: manual pairing'),
@@ -501,10 +515,10 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                           SwitchListTile(
                             title: const Text('Relay notifications'),
                             subtitle: const Text(
-                              'Notifications never grant Gmail access. Open the app to review; approved results return through the relay to Muse.',
+                              'Enable after each new pairing to receive requests. Unpairing turns this off. Notifications never grant Gmail access.',
                             ),
                             value: c.relayEnabled,
-                            onChanged: c.busy
+                            onChanged: c.busy || !c.pairingComplete
                                 ? null
                                 : (enabled) async {
                                     await c.enableRelay(enabled);
