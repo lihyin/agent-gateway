@@ -7,6 +7,9 @@
 
 在 GitHub Actions 的 **Production delivery** 检查以下步骤全部成功：
 
+只发布 production 和 TestFlight 时，将手动运行表单的 **deploy_staging** 关闭。
+此时不检查或部署 staging，只要求 production 的推送配置齐全。
+
 1. verify：Node、Flutter 和 Docker 检查。
 2. Check relay transport secrets before deployment：staging 和 production 配置名称齐全。
 3. staging、production 部署和健康/配对通道验证。

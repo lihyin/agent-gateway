@@ -1,6 +1,12 @@
 name: Production delivery
 on:
   workflow_dispatch:
+    inputs:
+      deploy_staging:
+        description: Also validate and deploy staging before production
+        type: boolean
+        default: true
+        required: true
 permissions:
   contents: read
 concurrency:
@@ -47,14 +53,18 @@ jobs:
           STAGING_RELAY_URL: ${{ vars.STAGING_RELAY_URL }}
           CM_API_TOKEN: ${{ secrets.CM_API_TOKEN }}
           CM_APP_ID: ${{ vars.CM_APP_ID }}
+          DEPLOY_STAGING: ${{ inputs.deploy_staging }}
         run: node scripts/require-release-config.mjs
       - name: Check relay transport secrets before deployment
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           WRANGLER_SEND_METRICS: "false"
+          DEPLOY_STAGING: ${{ inputs.deploy_staging }}
         run: |
-          for target in staging production; do
+          targets="production"
+          if [ "$DEPLOY_STAGING" = true ]; then targets="staging production"; fi
+          for target in $targets; do
             npx wrangler secret list --config relay/wrangler.toml --env "$target" > "$RUNNER_TEMP/relay-secret-names.json"
             TARGET_ENVIRONMENT="$target" SECRET_NAMES_FILE="$RUNNER_TEMP/relay-secret-names.json" node --input-type=module <<'JS'
           import { readFileSync } from 'node:fs';
@@ -66,6 +76,7 @@ jobs:
           JS
           done
       - name: Deploy staging and verify release
+        if: inputs.deploy_staging
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
