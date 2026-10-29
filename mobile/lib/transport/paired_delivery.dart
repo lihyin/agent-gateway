@@ -188,7 +188,7 @@ class PairedDelivery {
         }
         if (_pair == null) throw const GatewayError('unpaired');
         if (!await confirmation.confirm(
-          'Enable encrypted relay delivery to the paired agent? Approved results will be sent automatically while this app is open.',
+          'Enable encrypted relay delivery to the paired agent? Allowed results will be sent automatically while this app is open.',
         )) {
           throw const GatewayError('local_confirmation_required');
         }

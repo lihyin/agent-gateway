@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -27,8 +28,10 @@ class _PairingController extends GatewayController {
     required super.relay,
   });
   int starts = 0;
+  Future<bool> Function()? confirmation;
   @override
   Future<void> startPinPairing(Future<bool> Function() confirm) async {
+    confirmation = confirm;
     starts++;
     pinPairing = PinPairing(
       PinExchange(relay!.origin),
@@ -210,6 +213,70 @@ void main() {
       await tester.pumpAndSettle();
       expect(controller.pinPairing, isNull);
       expect(find.text('Pair with Muse'), findsOneWidget);
+      await tester.tap(find.text('Pair with Muse'));
+      await tester.pumpAndSettle();
+      const pushChannel = MethodChannel('agent_gateway/push');
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        pushChannel,
+        (_) async => null,
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          pushChannel,
+          null,
+        ),
+      );
+      controller.pinPairing!.status = 'confirming';
+      final answer = controller.confirmation!();
+      await tester.pumpAndSettle();
+      expect(find.text('Allow and authenticate'), findsNothing);
+      expect(find.text('Allow'), findsOneWidget);
+      expect(find.text('Deny'), findsOneWidget);
+      expect(
+        tester.widget<AlertDialog>(find.byType(AlertDialog)).actionsAlignment,
+        MainAxisAlignment.center,
+      );
+      await tester.tap(find.text('Deny'));
+      await tester.pumpAndSettle();
+      expect(await answer, isFalse);
+      controller.cancelPinPairing();
+      await tester.pumpAndSettle();
+      var notificationAnswer = Completer<bool?>();
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        pushChannel,
+        (call) async {
+          if (call.method == 'pairingPrompt') {
+            expect(
+              (call.arguments as Map)['session'],
+              controller.pinPairing!.exchange.session,
+            );
+            return notificationAnswer.future;
+          }
+          return null;
+        },
+      );
+      await tester.tap(find.text('Pair with Muse'));
+      await tester.pumpAndSettle();
+      controller.pinPairing!.status = 'confirming';
+      final allowed = controller.confirmation!();
+      await tester.pumpAndSettle();
+      notificationAnswer.complete(true);
+      await tester.pumpAndSettle();
+      expect(await allowed, isTrue);
+      expect(find.byType(AlertDialog), findsNothing);
+      controller.cancelPinPairing();
+      notificationAnswer = Completer<bool?>();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pair with Muse'));
+      await tester.pumpAndSettle();
+      controller.pinPairing!.status = 'confirming';
+      final cancelled = controller.confirmation!();
+      await tester.pumpAndSettle();
+      controller.cancelPinPairing();
+      await tester.pumpAndSettle();
+      notificationAnswer.complete(true);
+      await tester.pumpAndSettle();
+      expect(await cancelled, isFalse);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
@@ -252,8 +319,15 @@ void main() {
         expiresAt: now.add(const Duration(minutes: 5)),
       );
       await review.begin(request('remote-one', 'Find my invoice'));
+      const previewCapture = ValueKey('request-preview');
       await tester.pumpWidget(
-        GatewayApp(configuration: configuration, controller: controller),
+        RepaintBoundary(
+          key: previewCapture,
+          child: GatewayApp(
+            configuration: configuration,
+            controller: controller,
+          ),
+        ),
       );
       await tester.pumpAndSettle();
       expectMinimalScreen();
@@ -274,8 +348,25 @@ void main() {
       await tester.pumpAndSettle();
       expect(source.fetches, 1);
       expect(find.textContaining('Invoice for [redacted]'), findsOneWidget);
+      expect(find.byType(CircleAvatar), findsOneWidget);
+      await tester.ensureVisible(find.text('Share once'));
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        final boundary = tester.renderObject<RenderRepaintBoundary>(
+          find.byKey(previewCapture),
+        );
+        final image = await boundary.toImage(pixelRatio: 2);
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        await File('.dart_tool/request-preview.png')
+            .writeAsBytes(bytes!.buffer.asUint8List());
+        image.dispose();
+      });
       expect(find.textContaining('person@example.com'), findsNothing);
-      expect(find.text('1 email to share'), findsOneWidget);
+      expect(find.text('1 email'), findsOneWidget);
+      expect(find.text('1 email to share'), findsNothing);
+      expect(find.text('Needs your approval'), findsNothing);
+      expect(find.text('Device confirmation required'), findsNothing);
+      expect(find.text('Find my invoice'), findsNothing);
       expect(find.textContaining('Message ID:'), findsNothing);
       await tester.ensureVisible(find.text('Details'));
       await tester.tap(find.text('Details'));

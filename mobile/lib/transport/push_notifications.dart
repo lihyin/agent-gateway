@@ -26,6 +26,29 @@ class NativePushNotifications implements PushNotifications {
   void Function()? onTokenChanged;
   void Function()? onAction;
   static const _channel = MethodChannel('agent_gateway/push');
+  static Future<bool?> pairingPrompt(String session, int expiresAt) async {
+    try {
+      return await _channel.invokeMethod<bool>('pairingPrompt', {
+        'session': session,
+        'expiresAt': expiresAt,
+      });
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  static Future<void> clearPairingPrompt(String session) async {
+    try {
+      await _channel.invokeMethod<void>('clearPairingPrompt', session);
+    } on PlatformException {
+      // Notification cleanup cannot grant or revoke pairing authorization.
+    } on MissingPluginException {
+      // No native notification service on unsupported test/platform targets.
+    }
+  }
+
   @override
   Future<String> register() async =>
       (await _channel.invokeMethod<String>('register'))!;

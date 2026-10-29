@@ -8,6 +8,9 @@ import UserNotifications
   private var registration: FlutterResult?
   private var pushToken: String?
   private var registrationGeneration = 0
+  private var pairingPromptResult: FlutterResult?
+  private var pairingPromptSession: String?
+  private var pairingPromptExpiry = 0
   private let inboxLimit = 20
   private var actionsURL: URL { inboxURL.deletingLastPathComponent().appendingPathComponent("gateway-push-actions.json") }
   private var inboxURL: URL {
@@ -47,12 +50,16 @@ import UserNotifications
     URLCache.shared = URLCache(memoryCapacity: 0, diskCapacity: 0, diskPath: nil)
     UNUserNotificationCenter.current().delegate = self
     let actions = [
-      UNNotificationAction(identifier: "approve", title: "Approve", options: [.foreground, .authenticationRequired]),
+      UNNotificationAction(identifier: "approve", title: "Allow", options: [.foreground, .authenticationRequired]),
       UNNotificationAction(identifier: "review", title: "Review", options: [.foreground]),
       UNNotificationAction(identifier: "deny", title: "Deny", options: [.foreground])
     ]
     UNUserNotificationCenter.current().setNotificationCategories([
-      UNNotificationCategory(identifier: "AGW_DATA_REQUEST", actions: actions, intentIdentifiers: [], options: [])
+      UNNotificationCategory(identifier: "AGW_DATA_REQUEST", actions: actions, intentIdentifiers: [], options: []),
+      UNNotificationCategory(identifier: "AGW_PAIRING_CONFIRMATION", actions: [
+        UNNotificationAction(identifier: "pairing-allow", title: "Allow", options: [.foreground, .authenticationRequired]),
+        UNNotificationAction(identifier: "pairing-deny", title: "Deny", options: [.foreground])
+      ], intentIdentifiers: [], options: [])
     ])
     if let info = launchOptions?[.remoteNotification] as? [AnyHashable: Any] { receive(info) }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
@@ -63,6 +70,41 @@ import UserNotifications
     pushChannel?.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(FlutterError(code: "notifications_unavailable", message: nil, details: nil)); return }
       switch call.method {
+      case "pairingPrompt":
+        guard let arguments = call.arguments as? [String: Any], let session = arguments["session"] as? String,
+              session.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil,
+              let expiry = arguments["expiresAt"] as? Int,
+              expiry > Int(Date().timeIntervalSince1970), expiry <= Int(Date().timeIntervalSince1970) + 1800 else {
+          result(FlutterError(code: "invalid_request", message: nil, details: nil)); return
+        }
+        self.finishPairingPrompt(nil)
+        self.pairingPromptResult = result
+        self.pairingPromptSession = session
+        self.pairingPromptExpiry = expiry
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+          DispatchQueue.main.async {
+            guard self.pairingPromptSession == session else { return }
+            guard granted else { self.finishPairingPrompt(nil); return }
+            let content = UNMutableNotificationContent()
+            content.title = "Allow this Muse client to pair?"
+            content.body = "Allow only if you just gave the setup prompt to Muse."
+            content.sound = .default
+            content.categoryIdentifier = "AGW_PAIRING_CONFIRMATION"
+            content.userInfo = ["pairingSession": session, "expiresAt": expiry]
+            let request = UNNotificationRequest(identifier: "agw-pairing-\(session)", content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(request) { error in
+              if error != nil { DispatchQueue.main.async {
+                if self.pairingPromptSession == session { self.finishPairingPrompt(nil) }
+              } }
+            }
+          }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(expiry - Int(Date().timeIntervalSince1970))) {
+          if self.pairingPromptSession == session { self.finishPairingPrompt(false) }
+        }
+      case "clearPairingPrompt":
+        if let session = call.arguments as? String, session == self.pairingPromptSession { self.finishPairingPrompt(nil) }
+        result(nil)
       case "register":
         if self.registration != nil { result(FlutterError(code: "registration_busy", message: nil, details: nil)); return }
         self.registration = result
@@ -130,6 +172,18 @@ import UserNotifications
     registration = nil
     if error { callback(FlutterError(code: "notifications_unavailable", message: nil, details: nil)) } else { callback(pushToken) }
   }
+  private func finishPairingPrompt(_ decision: Bool?) {
+    let callback = pairingPromptResult
+    if let session = pairingPromptSession {
+      let identifier = "agw-pairing-\(session)"
+      UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
+      UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [identifier])
+    }
+    pairingPromptResult = nil
+    pairingPromptSession = nil
+    pairingPromptExpiry = 0
+    callback?(decision)
+  }
   override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
     let newToken = deviceToken.map { String(format: "%02x", $0) }.joined()
     if pushToken != newToken {
@@ -151,6 +205,15 @@ import UserNotifications
   }
   override func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
     DispatchQueue.main.async {
+      if response.notification.request.content.categoryIdentifier == "AGW_PAIRING_CONFIRMATION" {
+        if let session = response.notification.request.content.userInfo["pairingSession"] as? String,
+           session == self.pairingPromptSession, self.pairingPromptExpiry > Int(Date().timeIntervalSince1970) {
+          if response.actionIdentifier == "pairing-allow" { self.finishPairingPrompt(true) }
+          if response.actionIdentifier == "pairing-deny" { self.finishPairingPrompt(false) }
+        }
+        completionHandler()
+        return
+      }
       self.receive(response.notification.request.content.userInfo)
       if ["approve", "review", "deny"].contains(response.actionIdentifier),
          let envelope = response.notification.request.content.userInfo["agw"] as? [String: Any],

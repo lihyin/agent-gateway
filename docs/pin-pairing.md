@@ -30,11 +30,20 @@ hostname, callback service, or always-on PC is required.
    from the copied message. Do not put it in command arguments, environment
    variables, shell history, or logs. Keep this process running while confirming.
 
-5. The phone asks **Allow this Muse client to pair?** Approve only the attempt you
+5. The phone asks **Allow this Muse client to pair?** Allow only the attempt you
    just initiated, then authenticate with Face ID or the available device method.
    The client must prove knowledge of the code before this prompt appears.
 6. The phone reports that both endpoints are paired after Muse verifies and saves
    the receipt. The CLI returns `status: paired` plus public transport configuration.
+
+At the confirmation step, iOS also receives a local **Allow / Deny** notification.
+Allow returns to the current pairing attempt and retains device authentication;
+Deny cancels it. The matching dialog uses centered **Allow / Deny** buttons.
+Notification permission is optional: the in-app dialog remains available if it is
+denied. Notifications are bound to the live pairing session and expiry, contain
+no PIN, and cannot confirm a cancelled or previous session. If iOS suspends the
+app before it receives the pairing offer, return to the app to continue; this
+local notification does not provide a background network service.
 
 The code expires after at most thirty minutes and permits one attempt. There is no
 numeric-code lookup: the setup line carries a random session address as well as
@@ -61,8 +70,8 @@ The Muse card confirms copying inline: “Copied the setup prompt. Paste it into
 Muse's chatbox to continue”. No bottom copy-success banner is shown.
 
 Request notifications say “An agent requests to access your data”. The iOS
-notification category provides **Approve**, **Review**, and **Deny** actions.
-Approve and Review open the matching request for the existing access and
+notification category provides **Allow**, **Review**, and **Deny** actions.
+Allow and Review open the matching request for the existing access and
 disclosure confirmations; a generic notification never approves unseen data.
 Deny opens the app and rejects the matching request without reading Gmail.
 
@@ -71,6 +80,11 @@ ciphertext retains the notification until the request is handled or expires.
 Push delivery sets a pending badge of 1; app synchronization reconciles the
 actual pending-request count and clears it when none remain. Badge/notification
 presentation still depends on the user's iOS notification settings.
+
+Email previews use compact sender/avatar, subject, snippet and date rows. Only
+requested fields appear. The card shows the email count; the request purpose,
+query, limit and full disclosure are available under Details. Device confirmation
+is still enforced for sensitive requests without a separate explanatory banner.
 
 ## Recovery
 

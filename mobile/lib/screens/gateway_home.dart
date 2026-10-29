@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../approvals/review_service.dart';
 import '../domain/gateway_configuration.dart';
 import '../domain/muse_skill.dart';
+import '../transport/push_notifications.dart';
 import 'gateway_controller.dart';
 
 class GatewayHome extends StatefulWidget {
@@ -27,6 +28,8 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
   String? _copyFeedback;
   final _requestKeys = <String, GlobalKey>{};
   String? _selectedRequestId;
+  Completer<bool>? _pairingDecision;
+  String? _pairingPromptSession;
   Future<void> _copyMuseMessage(String message) async {
     try {
       await Clipboard.setData(ClipboardData(text: message));
@@ -47,6 +50,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    widget.controller.addListener(_pairingChanged);
     widget.controller.initialize();
     _expiry = Timer.periodic(const Duration(seconds: 15), (_) {
       if (!_obscured && widget.controller.ready && !widget.controller.busy) {
@@ -73,10 +77,29 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    widget.controller.removeListener(_pairingChanged);
+    if (_pairingDecision?.isCompleted == false) {
+      _pairingDecision!.complete(false);
+      final session = _pairingPromptSession;
+      if (session != null) {
+        unawaited(NativePushNotifications.clearPairingPrompt(session));
+      }
+    }
     WidgetsBinding.instance.removeObserver(this);
     _expiry?.cancel();
     _resumed?.complete();
     super.dispose();
+  }
+
+  void _pairingChanged() {
+    if (_pairingDecision?.isCompleted == false &&
+        widget.controller.pinPairing?.status != 'confirming') {
+      _pairingDecision!.complete(false);
+      final session = _pairingPromptSession;
+      if (session != null) {
+        unawaited(NativePushNotifications.clearPairingPrompt(session));
+      }
+    }
   }
 
   Future<void> _edit(ReviewEntry entry) async {
@@ -112,7 +135,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Approve edited preview'),
+            child: const Text('Allow edited preview'),
           ),
         ],
       ),
@@ -137,46 +160,92 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
   Future<bool> _confirmPairing() async {
     final pairing = widget.controller.pinPairing;
     if (pairing == null) return false;
-    if (_obscured) {
-      final remaining =
-          pairing.exchange.expiresAt * 1000 -
-          DateTime.now().millisecondsSinceEpoch;
-      if (remaining <= 0) return false;
-      try {
+    final decision = Completer<bool>();
+    _pairingDecision = decision;
+    _pairingPromptSession = pairing.exchange.session;
+    BuildContext? dialogContext;
+    bool current() =>
+        mounted &&
+        widget.controller.pinPairing == pairing &&
+        pairing.status == 'confirming' &&
+        pairing.exchange.expiresAt * 1000 >
+            DateTime.now().millisecondsSinceEpoch;
+    unawaited(
+      NativePushNotifications.pairingPrompt(
+        pairing.exchange.session,
+        pairing.exchange.expiresAt,
+      ).then((allow) {
+        if (allow != null && current() && !decision.isCompleted) {
+          decision.complete(allow);
+        }
+      }),
+    );
+    try {
+      if (_obscured) {
         await (_resumed ??= Completer<void>()).future.timeout(
-          Duration(milliseconds: remaining),
-        );
-      } on TimeoutException {
-        return false;
-      }
-    }
-    if (!mounted ||
-        _obscured ||
-        widget.controller.pinPairing != pairing ||
-        pairing.status != 'confirming') {
-      return false;
-    }
-    return await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('Allow this Muse client to pair?'),
-            content: const Text(
-              'The client proved it knows your one-time code. Continue only if you just gave the setup prompt to Muse. Gmail requests will still need your approval.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Deny'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Allow and authenticate'),
-              ),
-            ],
+          Duration(
+            milliseconds:
+                pairing.exchange.expiresAt * 1000 -
+                DateTime.now().millisecondsSinceEpoch,
           ),
-        ) ??
-        false;
+        );
+      }
+      if (!mounted || !current() || _obscured) return false;
+      if (!decision.isCompleted) {
+        unawaited(
+          showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) {
+              dialogContext = context;
+              return AlertDialog(
+                title: const Text('Allow this Muse client to pair?'),
+                content: const Text(
+                  'The client proved it knows your one-time code. Continue only if you just gave the setup prompt to Muse. Gmail requests will still need your approval.',
+                ),
+                actionsAlignment: MainAxisAlignment.center,
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Deny'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Allow'),
+                  ),
+                ],
+              );
+            },
+          ).then((allow) {
+            if (!decision.isCompleted) decision.complete(allow ?? false);
+          }),
+        );
+      }
+      final allow = await decision.future.timeout(
+        Duration(
+          milliseconds:
+              pairing.exchange.expiresAt * 1000 -
+              DateTime.now().millisecondsSinceEpoch,
+        ),
+      );
+      return allow && current() && !_obscured;
+    } on TimeoutException {
+      return false;
+    } finally {
+      if (identical(_pairingDecision, decision)) {
+        _pairingDecision = null;
+        _pairingPromptSession = null;
+      }
+      final dialog = dialogContext;
+      if (dialog != null &&
+          dialog.mounted &&
+          ModalRoute.of(dialog)?.isCurrent == true) {
+        Navigator.of(dialog).pop(false);
+      }
+      await NativePushNotifications.clearPairingPrompt(
+        pairing.exchange.session,
+      );
+    }
   }
 
   Future<void> _pairAndCopy(GatewayController c) async {
@@ -327,38 +396,89 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
     return value.toString();
   }
 
-  Widget _messagePreview(Map<String, dynamic> message) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          message['subject']?.toString() ?? 'Email',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        if (message['from'] != null || message['date'] != null)
-          Text(
-            [
-              if (message['from'] != null) message['from'].toString(),
-              if (message['date'] != null)
-                _previewValue('date', message['date']),
-            ].join(' · '),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall,
+  Widget _messagePreview(Map<String, dynamic> message) {
+    final sender = message['from']?.toString().trim();
+    final subject = message['subject']?.toString();
+    final name = sender?.split('<').first.trim();
+    final hasSender = name != null && name.isNotEmpty;
+    final initial = hasSender && !name.contains('[redacted]')
+        ? String.fromCharCode(name.runes.first).toUpperCase()
+        : null;
+    final date = message['date'] is int
+        ? DateTime.fromMillisecondsSinceEpoch(message['date'] * 1000).toLocal()
+        : null;
+    final now = DateTime.now();
+    final dates = MaterialLocalizations.of(context);
+    final dateLabel = date == null
+        ? null
+        : date.year == now.year &&
+              date.month == now.month &&
+              date.day == now.day
+        ? dates.formatTimeOfDay(TimeOfDay.fromDateTime(date))
+        : dates.formatShortMonthDay(date);
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: const Color(0xFFD3E3FD),
+            foregroundColor: const Color(0xFF0B57D0),
+            child: initial == null
+                ? const Icon(Icons.mail_outline_rounded, size: 20)
+                : Text(initial),
           ),
-        if (message['snippet'] != null)
-          Text(
-            message['snippet'].toString(),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        hasSender ? sender! : subject ?? 'Email',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    if (dateLabel != null) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        dateLabel,
+                        style: Theme.of(context).textTheme.labelSmall
+                            ?.copyWith(color: muted),
+                      ),
+                    ],
+                  ],
+                ),
+                if (hasSender && subject != null)
+                  Text(
+                    subject,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                if (message['snippet'] != null)
+                  Text(
+                    message['snippet'].toString(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: muted),
+                  ),
+              ],
+            ),
           ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 
   Widget _entry(ReviewEntry entry, bool busy) {
     if (!entry.request.expiresAt.isAfter(DateTime.now())) {
@@ -373,23 +493,11 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              entry.request.purpose,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+              entry.state == ReviewState.disclosure
+                  ? '${entry.candidate.length} ${entry.candidate.length == 1 ? 'email' : 'emails'}'
+                  : 'Email request',
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: 4),
-            Text(
-              entry.state == ReviewState.disclosure
-                  ? '${entry.candidate.length} ${entry.candidate.length == 1 ? 'email' : 'emails'} to share'
-                  : 'Up to ${entry.request.maxResults} ${entry.request.maxResults == 1 ? 'email' : 'emails'}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            if (entry.request.highRisk)
-              const Padding(
-                padding: EdgeInsets.only(top: 4),
-                child: Text('Device confirmation required'),
-              ),
             if (entry.state == ReviewState.fetching)
               const Padding(
                 padding: EdgeInsets.only(top: 16),
@@ -439,6 +547,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                     children: [
                       SelectableText(entry.request.purpose),
                       SelectableText('Search: ${entry.request.query}'),
+                      Text('Limit: ${entry.request.maxResults} emails'),
                       Text(
                         '${dates.formatShortDate(entry.request.since.toLocal())} – ${dates.formatShortDate(entry.request.until.toLocal())}',
                       ),
@@ -621,16 +730,8 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                               child: const Text('Reset saved approvals'),
                             ),
                           ),
-                        const SizedBox(height: 24),
+                        SizedBox(height: pending.isNotEmpty ? 12 : 24),
                         if (pending.isNotEmpty) ...[
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: Text(
-                              'Needs your approval',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
                           for (final entry in pending) _entry(entry, c.busy),
                         ] else
                           Padding(
