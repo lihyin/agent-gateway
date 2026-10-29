@@ -23,7 +23,7 @@ The default [pairing flow](pin-pairing.md) uses a thirty-minute, single-attempt
 eight-digit PIN with library SRP-6a, followed by role/session/origin/expiry-bound
 JOSE records carrying the existing signed offer and receipt. Device confirmation
 and local authentication precede pinning. A random session address, separate from
-the PIN, enters relay URLs. The trusted Muse setup message contains the PIN;
+the PIN, enters relay URLs. The trusted Muse setup prompt contains the PIN;
 it must not enter logs, shell arguments or public chat. The relay never receives
 the PIN, verifier, shared key or private endpoint keys. Manual full-fingerprint
 comparison remains an advanced fallback.
@@ -40,7 +40,7 @@ quotas and physical-device acceptance remain operational checks. No audit is cla
 ## Relay-only transport
 
 Re-pairing is explicit endpoint intent, not a response to an untrusted relay error.
-The setup message authorizes the agent client's `pair --replace` flow. Existing
+The setup prompt authorizes the agent client's `pair --replace` flow. Existing
 local trust remains pinned until the new SRP exchange and device-signed receipt
 pass verification and the phone confirms/authenticates. Failed/cancelled attempts
 cannot replace the old pair. Success preserves agent keys and clears old-epoch

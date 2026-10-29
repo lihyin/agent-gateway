@@ -16,6 +16,12 @@ import 'support/fakes.dart';
 
 class _Push implements PushNotifications {
   @override
+  Future<List<PushAction>> actions() async => [];
+  @override
+  Future<void> acknowledgeAction(PushAction action) async {}
+  @override
+  Future<void> setBadgeCount(int count) async {}
+  @override
   Future<String> register() async => 'a' * 64;
   @override
   Future<List<String>> pending() async => [];

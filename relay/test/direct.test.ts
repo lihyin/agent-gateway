@@ -215,6 +215,12 @@ test("APNs uses generic alerts, fixed provider, bounded ciphertext and original 
       );
       assert.equal(input.redirect, "manual");
       const payload = JSON.parse(input.body as string);
+      assert.deepEqual(payload.aps.alert, {
+        title: "Agent Gateway",
+        body: "An agent requests to access your data",
+      });
+      assert.equal(payload.aps.badge, 1);
+      assert.equal(payload.aps.category, "AGW_DATA_REQUEST");
       assert.deepEqual(payload.agw, s.job.envelope);
       assert.ok(!String(input.body).includes(f.payload.query as string));
       assert.equal(

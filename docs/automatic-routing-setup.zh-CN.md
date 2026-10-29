@@ -115,7 +115,7 @@ App Store Connect → 对应 App → TestFlight：确认构建已处理、必要
 
 ## 4. 更新 Muse 客户端并配对
 
-把 App 的 **Pair with Muse** 生成的完整 setup message 发给你的可信 Muse 会话。
+把 App 的 **Pair with Muse** 生成的完整 setup prompt 发给你的可信 Muse 会话。
 该消息包含客户端安装说明和一次性 `AGW1` 行，勿发到公开群聊。
 
 Muse 的现有运行环境需要 Node 22+、该仓库最新客户端及出站 WebSocket 能力。
@@ -204,7 +204,7 @@ Gmail 连接、Muse 配对和通知开关是独立状态。只断开 Gmail 后�
 重新配对。若在手机点击了 **Unpair agent**，再次连接时按以下步骤操作：
 
 1. 连接 Gmail。
-2. 点击 **Pair with Muse**，生成并复制新的完整 setup message 到可信 Muse 会话。
+2. 点击 **Pair with Muse**，生成并复制新的完整 setup prompt 到可信 Muse 会话。
 3. Muse 按新消息更新客户端、停止旧 MCP，并执行明确的重新配对流程。
    手机解绑不会删除 Muse 环境内的旧状态；新消息中的 `pair --replace` 负责安全替换。
 4. 在手机确认并完成认证，然后重新开启 **Relay notifications**。
@@ -213,7 +213,7 @@ Gmail 连接、Muse 配对和通知开关是独立状态。只断开 Gmail 后�
 普通用户不需要删除状态文件、运行终端命令或修改 Cloudflare 配置。Muse 只有在
 新验证码和手机确认均成功后才替换旧本地配对；失败时保留旧状态。
 已安装旧版 App/客户端时，可让 Muse 先用原状态路径执行 CLI `unpair`，再按新的
-手机 setup message 配对。这是代理执行的恢复操作，不要求用户自行操作终端。
+手机 setup prompt 配对。这是代理执行的恢复操作，不要求用户自行操作终端。
 
 - **缺少 Worker secret**：发布的预检步骤会列出缺失的名称，分别补齐两环境。
 - **Gmail 登录失败**：核对 iOS client ID、bundle ID、Google 测试用户，以及 App

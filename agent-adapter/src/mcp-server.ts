@@ -31,7 +31,7 @@ async function main() {
             process.stderr.write(
               error instanceof Error &&
                 error.message === "relay_pairing_rejected"
-                ? "The relay rejected the saved pairing. Ask the user for a fresh iPhone setup message, stop this MCP process, then use pair --replace and enable phone notifications.\n"
+                ? "The relay rejected the saved pairing. Ask the user for a fresh iPhone setup prompt, stop this MCP process, then use pair --replace and enable phone notifications.\n"
                 : "Relay delivery incomplete; check configuration and retry the same request before expiry.\n",
             );
         })

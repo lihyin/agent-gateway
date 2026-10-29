@@ -21,6 +21,8 @@ class ForegroundRelay {
     if (this.notifications is NativePushNotifications) {
       (this.notifications as NativePushNotifications).onTokenChanged =
           invalidateRegistration;
+      (this.notifications as NativePushNotifications).onAction = () =>
+          onAction?.call();
     }
   }
   DateTime? _registeredAt;
@@ -41,6 +43,8 @@ class ForegroundRelay {
   final DateTime Function() clock;
   final PushNotifications notifications;
   final Set<String> _handedOff = {};
+  String? selectedRequestId;
+  void Function()? onAction;
   static String _origin(String value) {
     final uri = Uri.tryParse(value);
     if (uri == null ||
@@ -143,6 +147,7 @@ class ForegroundRelay {
       200,
     );
     invalidateRegistration();
+    await clearNotifications();
   }
 
   Future<void> revoke(PairedDelivery delivery) async {
@@ -152,10 +157,23 @@ class ForegroundRelay {
       200,
     );
     invalidateRegistration();
+    await clearNotifications();
+  }
+
+  Future<void> clearNotifications() async {
+    for (final encoded in await notifications.pending()) {
+      await notifications.acknowledge(encoded);
+    }
+    for (final action in await notifications.actions()) {
+      await notifications.acknowledgeAction(action);
+    }
+    selectedRequestId = null;
+    await notifications.setBadgeCount(0);
   }
 
   Future<void> sync(PairedDelivery delivery, ReviewService review) async {
     if (!delivery.relayEnabled(origin)) return;
+    final imported = <String, String>{};
     // Notifications only deliver ciphertext. Import never grants Gmail access.
     for (final encoded in await notifications.pending()) {
       if (!delivery.relayEnabled(origin)) return;
@@ -172,7 +190,38 @@ class ForegroundRelay {
         }
         rethrow;
       }
-      await notifications.acknowledge(encoded);
+      imported[encoded] =
+          (jsonDecode(encoded)['context']['requestId']) as String;
+    }
+    for (final action in await notifications.actions()) {
+      final matching = (await review.entries()).where(
+        (entry) =>
+            entry.request.id == action.requestId &&
+            entry.request.agentId == delivery.agentId &&
+            entry.request.pairingEpoch ==
+                delivery.epoch(entry.request.agentId) &&
+            entry.request.expiresAt.isAfter(clock()),
+      );
+      if (matching.isNotEmpty) {
+        final entry = matching.single;
+        if (action.action == 'deny') {
+          if (entry.state == ReviewState.access) {
+            await review.denyAccess(entry.request.id, entry.revision);
+          } else if (entry.state == ReviewState.disclosure) {
+            await review.decide(
+              entry.request.id,
+              entry.revision,
+              entry.candidateDigest,
+              ReviewAction.deny,
+            );
+          }
+        } else if (['approve', 'review'].contains(action.action)) {
+          // A generic notification cannot replace inspecting the disclosure.
+          // Both actions open the authenticated request for in-app approval.
+          selectedRequestId = entry.request.id;
+        }
+      }
+      await notifications.acknowledgeAction(action);
     }
     final entries = (await review.entries())
         .where(
@@ -182,6 +231,26 @@ class ForegroundRelay {
                   delivery.epoch(entry.request.agentId),
         )
         .toList();
+    final pendingIds = entries
+        .where(
+          (entry) =>
+              entry.request.expiresAt.isAfter(clock()) &&
+              [
+                ReviewState.access,
+                ReviewState.fetching,
+                ReviewState.disclosure,
+              ].contains(entry.state),
+        )
+        .map((entry) => entry.request.id)
+        .toSet();
+    await notifications.setBadgeCount(pendingIds.length);
+    // Importing ciphertext is not user review: retain its notification until
+    // the request is allowed, denied, expired or otherwise no longer pending.
+    for (final item in imported.entries) {
+      if (!pendingIds.contains(item.value)) {
+        await notifications.acknowledge(item.key);
+      }
+    }
     _handedOff.removeWhere(
       (id) => !entries.any((entry) => entry.request.id == id),
     );

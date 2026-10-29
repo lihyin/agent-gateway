@@ -364,8 +364,15 @@ export async function push(
     throw new Error("transport_unavailable");
   const payload = JSON.stringify({
     aps: {
-      alert: { title: "Agent Gateway", body: "A request is ready for review." },
+      alert: {
+        title: "Agent Gateway",
+        body: "An agent requests to access your data",
+      },
       sound: "default",
+      // A pending indicator while the app is suspended. The authenticated app
+      // reconciles the exact active-request count after importing requests.
+      badge: 1,
+      category: "AGW_DATA_REQUEST",
     },
     agw: request,
   });

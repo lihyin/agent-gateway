@@ -121,7 +121,8 @@ void main() {
     expect(notifications.queue, hasLength(1));
     await delivery.enableRelay(origin, true);
     await relay.sync(delivery, review);
-    expect(notifications.queue, isEmpty);
+    expect(notifications.queue, hasLength(1));
+    expect(notifications.badge, 1);
     expect(source.fetches, 0);
     expect(calls, 0);
     final entry = (await review.entries()).single;
@@ -139,7 +140,51 @@ void main() {
     await relay.sync(delivery, review);
     expect(source.fetches, 1);
     expect(calls, 1);
+    expect(notifications.queue, isEmpty);
+    expect(notifications.badge, 0);
   });
+  for (final action in ['approve', 'review', 'deny']) {
+    test(
+      'notification $action routes to review or denies without data access',
+      () async {
+        final requestId = uuid();
+        final envelope = encryptEnvelope(agent, publicIdentity(device), {
+          ...Map<String, dynamic>.from(f['context']),
+          'requestId': requestId,
+          'pairingEpoch': delivery.epoch(identityId(agent)),
+        }, Map<String, dynamic>.from(f['payload']));
+        final notifications = FakePush()
+          ..queue.add(jsonEncode(envelope))
+          ..intents.add(PushAction(requestId, action, 'intent-$action'));
+        final relay = ForegroundRelay(
+          origin,
+          clock: () => now,
+          notifications: notifications,
+          client: MockClient(
+            (_) async =>
+                http.Response(jsonEncode({'status': 'handed_off'}), 202),
+          ),
+        );
+        addTearDown(relay.close);
+        await delivery.enableRelay(origin, true);
+        await relay.sync(delivery, review);
+        expect(source.fetches, 0);
+        expect(notifications.intents, isEmpty);
+        final entry = (await review.entries()).single;
+        if (action == 'deny') {
+          expect(entry.state, ReviewState.denied);
+          expect(notifications.badge, 0);
+          expect(notifications.queue, isEmpty);
+        } else {
+          expect(entry.state, ReviewState.access);
+          expect(relay.selectedRequestId, requestId);
+          expect(notifications.badge, 1);
+          expect(notifications.queue, hasLength(1));
+        }
+      },
+    );
+  }
+
   test('registration uses device proof, survives restart, and is revoked by unpairing', () async {
     await delivery.enableRelay(origin, true);
     final relay = ForegroundRelay(
@@ -281,6 +326,20 @@ void main() {
 
 class FakePush implements PushNotifications {
   final List<String> queue = [];
+  final List<PushAction> intents = [];
+  int badge = 0;
+  @override
+  Future<List<PushAction>> actions() async => List.of(intents);
+  @override
+  Future<void> acknowledgeAction(PushAction action) async {
+    intents.remove(action);
+  }
+
+  @override
+  Future<void> setBadgeCount(int count) async {
+    badge = count;
+  }
+
   @override
   Future<String> register() async => 'a' * 64;
   @override

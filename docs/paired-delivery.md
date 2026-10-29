@@ -1,7 +1,7 @@
 # Pairing and foreground encrypted delivery
 
 The primary flow is [Pair with Muse using a one-time code](pin-pairing.md): tap,
-copy one setup message to Muse, then approve and authenticate on the phone.
+copy one setup prompt to Muse, then approve and authenticate on the phone.
 Offers and receipts transfer automatically over an SRP-authenticated channel.
 The instructions below are the **Advanced: manual pairing** fallback, which pins
 one device and one agent with two-way fingerprint comparison and device
@@ -104,7 +104,7 @@ agent-side jobs/pinned device keys.
   outcome files contain ciphertext. The agent can retain approved plaintext after
   decrypting; the phone cannot revoke already disclosed data.
 - The advanced manual flow copies public pairing material/ciphertext. The code
-  flow's setup message also contains its short-lived secret PIN: send it only to
+  flow's setup prompt also contains its short-lived secret PIN: send it only to
   trusted Muse and keep it out of logs. Google credentials and device private
   keys are never exported.
 - Remove a stale agent `.lock` file after a crash only after verifying no process

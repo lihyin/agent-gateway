@@ -9,18 +9,20 @@ import UserNotifications
   private var pushToken: String?
   private var registrationGeneration = 0
   private let inboxLimit = 20
+  private var actionsURL: URL { inboxURL.deletingLastPathComponent().appendingPathComponent("gateway-push-actions.json") }
   private var inboxURL: URL {
     let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
     return root.appendingPathComponent("gateway-push-inbox.json")
   }
-  private func inbox() -> [String] {
-    guard let data = try? Data(contentsOf: inboxURL), let values = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+  private func inbox(at url: URL? = nil) -> [String] {
+    guard let data = try? Data(contentsOf: url ?? inboxURL), let values = try? JSONDecoder().decode([String].self, from: data) else { return [] }
     return Array(values.prefix(inboxLimit))
   }
-  private func saveInbox(_ values: [String]) throws {
+  private func saveInbox(_ values: [String], at destination: URL? = nil) throws {
+    let destination = destination ?? inboxURL
     try FileManager.default.createDirectory(at: inboxURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-    try JSONEncoder().encode(values).write(to: inboxURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-    var url = inboxURL
+    try JSONEncoder().encode(values).write(to: destination, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    var url = destination
     var resourceValues = URLResourceValues()
     resourceValues.isExcludedFromBackup = true
     try url.setResourceValues(resourceValues)
@@ -44,6 +46,14 @@ import UserNotifications
   override func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
     URLCache.shared = URLCache(memoryCapacity: 0, diskCapacity: 0, diskPath: nil)
     UNUserNotificationCenter.current().delegate = self
+    let actions = [
+      UNNotificationAction(identifier: "approve", title: "Approve", options: [.foreground, .authenticationRequired]),
+      UNNotificationAction(identifier: "review", title: "Review", options: [.foreground]),
+      UNNotificationAction(identifier: "deny", title: "Deny", options: [.foreground])
+    ]
+    UNUserNotificationCenter.current().setNotificationCategories([
+      UNNotificationCategory(identifier: "AGW_DATA_REQUEST", actions: actions, intentIdentifiers: [], options: [])
+    ])
     if let info = launchOptions?[.remoteNotification] as? [AnyHashable: Any] { receive(info) }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
@@ -90,6 +100,27 @@ import UserNotifications
           }
         }
         catch { result(FlutterError(code: "push_storage_unavailable", message: nil, details: nil)) }
+      case "actions":
+        result(self.inbox(at: self.actionsURL))
+      case "acknowledgeAction":
+        guard let encoded = call.arguments as? String else { result(FlutterError(code: "invalid_request", message: nil, details: nil)); return }
+        do {
+          try self.saveInbox(self.inbox(at: self.actionsURL).filter { $0 != encoded }, at: self.actionsURL)
+          result(nil)
+        } catch { result(FlutterError(code: "push_storage_unavailable", message: nil, details: nil)) }
+      case "setBadgeCount":
+        guard let count = call.arguments as? Int, count >= 0, count <= self.inboxLimit else { result(FlutterError(code: "invalid_request", message: nil, details: nil)); return }
+        if #available(iOS 16.0, *) {
+          // Badge presentation must never block encrypted result delivery.
+          UNUserNotificationCenter.current().setBadgeCount(count) { _ in
+            DispatchQueue.main.async {
+              result(nil)
+            }
+          }
+        } else {
+          UIApplication.shared.applicationIconBadgeNumber = count
+          result(nil)
+        }
       default: result(FlutterMethodNotImplemented)
       }
     }
@@ -115,12 +146,30 @@ import UserNotifications
   override func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
     DispatchQueue.main.async {
       self.receive(notification.request.content.userInfo)
-      completionHandler([.banner, .sound])
+      completionHandler([.banner, .list, .sound, .badge])
     }
   }
   override func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
     DispatchQueue.main.async {
       self.receive(response.notification.request.content.userInfo)
+      if ["approve", "review", "deny"].contains(response.actionIdentifier),
+         let envelope = response.notification.request.content.userInfo["agw"] as? [String: Any],
+         let context = envelope["context"] as? [String: Any],
+         let requestId = context["requestId"] as? String, requestId.count <= 128,
+         let expiry = context["expiresAt"] as? Int, expiry > Int(Date().timeIntervalSince1970) {
+        let action: [String: Any] = ["action": response.actionIdentifier, "requestId": requestId, "expiresAt": expiry]
+        if let data = try? JSONSerialization.data(withJSONObject: action, options: [.sortedKeys]),
+           let encoded = String(data: data, encoding: .utf8) {
+          var values = self.inbox(at: self.actionsURL).filter { value in
+            guard let data = value.data(using: .utf8), let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let expiry = object["expiresAt"] as? Int else { return false }
+            return expiry > Int(Date().timeIntervalSince1970) && (object["requestId"] as? String) != requestId
+          }
+          values.append(encoded)
+          try? self.saveInbox(Array(values.suffix(self.inboxLimit)), at: self.actionsURL)
+          self.pushChannel?.invokeMethod("actionReceived", arguments: nil)
+        }
+      }
       completionHandler()
     }
   }

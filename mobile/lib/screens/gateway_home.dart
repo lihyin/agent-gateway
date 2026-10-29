@@ -24,20 +24,22 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
   Timer? _expiry;
   Completer<void>? _resumed;
   bool _obscured = false;
+  String? _copyFeedback;
+  final _requestKeys = <String, GlobalKey>{};
+  String? _selectedRequestId;
   Future<void> _copyMuseMessage(String message) async {
     try {
       await Clipboard.setData(ClipboardData(text: message));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Copied. Paste into Muse, then return here.'),
-        ),
-      );
+      setState(() {
+        _copyFeedback =
+            "Copied the setup prompt. Paste it into Muse's chatbox to continue";
+      });
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not copy. Please try again.')),
-      );
+      setState(() {
+        _copyFeedback = 'Could not copy. Please try again.';
+      });
     }
   }
 
@@ -160,7 +162,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
           builder: (context) => AlertDialog(
             title: const Text('Allow this Muse client to pair?'),
             content: const Text(
-              'The client proved it knows your one-time code. Continue only if you just gave the setup message to Muse. Gmail requests will still need your approval.',
+              'The client proved it knows your one-time code. Continue only if you just gave the setup prompt to Muse. Gmail requests will still need your approval.',
             ),
             actions: [
               TextButton(
@@ -179,11 +181,10 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
 
   Future<void> _pairAndCopy(GatewayController c) async {
     if (c.pairingComplete) {
-      final message = c.museSkill;
-      if (message != null) await _copyMuseMessage(message);
       return;
     }
     if (c.pinPairing?.status != 'waiting') {
+      setState(() => _copyFeedback = null);
       await c.startPinPairing(_confirmPairing);
     }
     if (!mounted || _obscured || c.error != null) return;
@@ -199,21 +200,36 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
   }
 
   Widget _museCard(GatewayController c) {
+    if (c.pairingComplete) {
+      return Card(
+        child: ListTile(
+          leading: const Icon(Icons.link_rounded),
+          title: _connectionTitle('Muse', 'Paired'),
+          trailing: TextButton(
+            onPressed: c.busy
+                ? null
+                : () async {
+                    setState(() => _copyFeedback = null);
+                    await c.unpair();
+                  },
+            child: const Text('Unpair'),
+          ),
+        ),
+      );
+    }
     final pairing = c.pinPairing;
     final active =
         pairing != null && !['paired', 'failed'].contains(pairing.status);
-    final canCopy = c.pairingComplete || pairing?.status == 'waiting';
-    final status = c.pairingComplete
-        ? 'Connected'
-        : switch (pairing?.status) {
-            'connecting' => 'Connecting...',
-            'waiting' => 'Paste the copied message into Muse.',
-            'authenticating' || 'offer' => 'Verifying Muse...',
-            'confirming' => 'Confirm the connection on this iPhone.',
-            'finishing' => 'Finishing pairing...',
-            'failed' => _errorMessage(pairing?.error ?? 'pairing_failed'),
-            _ => 'Pair once to receive Gmail requests.',
-          };
+    final canCopy = pairing?.status == 'waiting';
+    final status = switch (pairing?.status) {
+      'connecting' => 'Connecting...',
+      'waiting' => _copyFeedback ?? 'Copy the setup prompt to continue.',
+      'authenticating' || 'offer' => 'Verifying Muse...',
+      'confirming' => 'Confirm the connection on this iPhone.',
+      'finishing' => 'Finishing pairing...',
+      'failed' => _errorMessage(pairing?.error ?? 'pairing_failed'),
+      _ => 'Pair once to receive Gmail requests.',
+    };
     return Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -237,15 +253,13 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                       ? null
                       : () => _pairAndCopy(c),
                   icon: Icon(
-                    c.pairingComplete || pairing?.status == 'waiting'
+                    pairing?.status == 'waiting'
                         ? Icons.copy_rounded
                         : Icons.link_rounded,
                   ),
                   label: Text(
-                    c.pairingComplete
-                        ? 'Copy Muse setup'
-                        : pairing?.status == 'waiting'
-                        ? 'Copy setup message'
+                    pairing?.status == 'waiting'
+                        ? 'Copy setup prompt'
                         : 'Pair with Muse',
                   ),
                 ),
@@ -254,6 +268,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                     onPressed: c.busy
                         ? null
                         : () async {
+                            setState(() => _copyFeedback = null);
                             if (c.delivery?.agentId != null) {
                               await c.unpair();
                             } else {
@@ -262,14 +277,6 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                           },
                     child: const Text('Cancel pairing'),
                   ),
-                if (c.pairingComplete)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: c.busy ? null : c.unpair,
-                      child: const Text('Unpair Muse'),
-                    ),
-                  ),
               ],
             ),
           ),
@@ -277,6 +284,22 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
       ),
     );
   }
+
+  Widget _connectionTitle(String name, String status) => Row(
+    children: [
+      Text(name),
+      const SizedBox(width: 12),
+      Flexible(
+        child: Text(
+          status,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ),
+    ],
+  );
 
   String _fieldLabel(String field) => switch (field) {
     'id' => 'Message ID',
@@ -335,6 +358,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
     }
     final dates = MaterialLocalizations.of(context);
     return Card(
+      key: _requestKeys.putIfAbsent(entry.request.id, () => GlobalKey()),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -471,7 +495,33 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
     listenable: widget.controller,
     builder: (context, child) {
       final c = widget.controller;
-      final pending = c.pendingEntries;
+      final pending = c.pendingEntries.reversed.toList();
+      _selectedRequestId = c.relay?.selectedRequestId ?? _selectedRequestId;
+      final selectedIndex = pending.indexWhere(
+        (entry) => entry.request.id == _selectedRequestId,
+      );
+      if (selectedIndex >= 0) {
+        pending.insert(0, pending.removeAt(selectedIndex));
+      } else {
+        _selectedRequestId = null;
+      }
+      _requestKeys.removeWhere(
+        (id, _) => !pending.any((entry) => entry.request.id == id),
+      );
+      final selected = c.relay?.selectedRequestId;
+      if (!_obscured && selected != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _obscured) return;
+          final target = _requestKeys[selected]?.currentContext;
+          if (target != null) {
+            c.relay?.selectedRequestId = null;
+            Scrollable.ensureVisible(
+              target,
+              duration: const Duration(milliseconds: 250),
+            );
+          }
+        });
+      }
       final allSet = c.connected && c.pairingComplete && c.relayEnabled;
       return Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
@@ -493,8 +543,8 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                         Card(
                           child: ListTile(
                             leading: const Icon(Icons.mail_outline_rounded),
-                            title: const Text('Gmail'),
-                            subtitle: Text(
+                            title: _connectionTitle(
+                              'Gmail',
                               c.connected ? 'Connected' : 'Not connected',
                             ),
                             trailing: TextButton(
@@ -505,9 +555,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                                   ? c.disconnect
                                   : c.connect,
                               child: Text(
-                                c.connected
-                                    ? 'Disconnect Gmail'
-                                    : 'Connect Gmail',
+                                c.connected ? 'Disconnect' : 'Connect Gmail',
                               ),
                             ),
                           ),
@@ -575,8 +623,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          for (final entry in pending.reversed)
-                            _entry(entry, c.busy),
+                          for (final entry in pending) _entry(entry, c.busy),
                         ] else
                           Padding(
                             padding: const EdgeInsets.symmetric(
@@ -648,7 +695,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
       'Pairing was declined. Generate a fresh code to try again.',
     'pairing_interrupted' => 'The connection ended. Check whether Muse paired; otherwise unpair and try a fresh code.',
     'pairing_unavailable' => 'Cannot reach pairing on the relay. Check connectivity and that the new relay version is deployed.',
-    'invalid_pairing' => 'Pairing failed. Try a new setup message.',
+    'invalid_pairing' => 'Pairing failed. Try a new setup prompt.',
     'invalid_envelope' =>
       'Encrypted transfer is invalid or exceeds its size limit.',
     'relay_unavailable' => 'Relay delivery is unavailable. Keep the app open to retry before the request expires.',

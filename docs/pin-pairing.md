@@ -11,7 +11,7 @@ hostname, callback service, or always-on PC is required.
    needs the `PAIRINGS` binding, `v2-pairing` migration, and exact `RELAY_ORIGIN`.
    Pairing does not require APNs, Gmail, or the notification transport pins.
 2. On an unpaired iPhone, tap **Pair with Muse**. This starts pairing and copies
-   the setup message in one action.
+   the setup prompt in one action.
 3. Paste the copied message into your trusted Muse conversation.
    One message includes the setup line and a reusable Gmail SKILL bound to this
    app's relay origin. Return to Agent Gateway to confirm the pairing. Muse is
@@ -52,14 +52,31 @@ Pairing registers device-signed public transport identities in PairingRegistry.
 Enable **Notifications** on the phone once and grant iOS permission.
 The relay stores the encrypted push destination and selects it using the verified
 pairing. No per-user secret edit, route copying or daily refresh is required.
-The original setup message already contains the reusable Gmail skill.
+The original setup prompt already contains the reusable Gmail skill.
 See [relay setup](remote-delivery.md). Pairing itself sends no push.
+
+## Request notifications
+
+The Muse card confirms copying inline: “Copied the setup prompt. Paste it into
+Muse's chatbox to continue”. No bottom copy-success banner is shown.
+
+Request notifications say “An agent requests to access your data”. The iOS
+notification category provides **Approve**, **Review**, and **Deny** actions.
+Approve and Review open the matching request for the existing access and
+disclosure confirmations; a generic notification never approves unseen data.
+Deny opens the app and rejects the matching request without reading Gmail.
+
+Foreground requests appear as banners and in Notification Center. Importing
+ciphertext retains the notification until the request is handled or expires.
+Push delivery sets a pending badge of 1; app synchronization reconciles the
+actual pending-request count and clears it when none remain. Badge/notification
+presentation still depends on the user's iOS notification settings.
 
 ## Recovery
 
 Ordinary users can unpair/disconnect and reconnect from the phone. Phone unpairing
 revokes relay access but cannot delete the private state file in Muse's runtime.
-A fresh phone setup message explicitly instructs the updated client to run
+A fresh phone setup prompt explicitly instructs the updated client to run
 `pair --replace`. Muse stops the old MCP process and runs this itself; the user
 does not need terminal commands, state-file deletion or relay configuration.
 The old local pair remains until the new SRP exchange, device-signed receipt and
@@ -85,7 +102,7 @@ and replay prevention remains internal; there is no request-history screen.
 - Cancellation or rejected device authentication grants no new pairing. A late
   authentication result cannot commit after session cancellation or expiry.
 - An interrupted final receipt/acknowledgment can leave one endpoint paired.
-  Unpair the phone and copy a fresh setup message; the updated Muse client uses
+  Unpair the phone and copy a fresh setup prompt; the updated Muse client uses
   `pair --replace` to recover. This is explicit recovery, not automatic rollback
   of a saved identity. Older clients can recover with CLI `unpair` before `pair`;
   these commands are run by Muse in its runtime, not by the phone user.
@@ -147,7 +164,7 @@ Gmail data, or approval authority. It forwards public SRP values and encrypted
 records; it cannot perform passive offline PIN guessing from these messages.
 An active attacker gets at most one online guess per phone session and can still
 deny service. Codes must be delivered through a trusted Muse conversation.
-Anyone who receives the setup message knows the code; the phone confirmation
+Anyone who receives the setup prompt knows the code; the phone confirmation
 protects against unsolicited pairing but cannot distinguish two holders of it.
 
 Fresh public session addresses prevent enumeration, but do not authenticate room

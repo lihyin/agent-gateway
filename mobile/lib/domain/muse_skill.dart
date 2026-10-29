@@ -14,7 +14,7 @@ Runtime setup:
 - Use the Agent Gateway client inside your existing runtime, with Node 22+. If absent, obtain https://github.com/lihyin/agent-gateway, run npm ci and npm run build --workspace agent-adapter. Preserve any existing private GATEWAY_AGENT_STATE; otherwise choose a private, backup-excluded state path. Never share or print that file.
 - If this runtime cannot install/run the client or maintain outbound WebSockets, explain that limitation. Do not invent a connector or claim to be connected.
 - Pairing registers public identities automatically. Enable Relay notifications on the phone once. The relay selects its current push destination using the verified pairing. No extra server or callback URL is needed.
-- Unpairing the phone revokes relay access but does not erase your local pairing state. When I explicitly ask to pair again with a fresh setup message, stop the MCP process and use pair --replace. Reconnect Gmail and enable Relay notifications on the phone after re-pairing. Do not treat locally saved pairing state as proof that delivery still works.
+- Unpairing the phone revokes relay access but does not erase your local pairing state. When I explicitly ask to pair again with a fresh setup prompt, stop the MCP process and use pair --replace. Reconnect Gmail and enable Relay notifications on the phone after re-pairing. Do not treat locally saved pairing state as proof that delivery still works.
 
 When I ask about email:
 - Use the paired client, not a direct Gmail connection. Never request Gmail tokens, passwords, private keys or approval overrides.
@@ -32,7 +32,7 @@ String musePairingMessage({
     '''
 Pair this Meta Muse runtime with my Agent Gateway iPhone, then retain the Gmail SKILL below for my future email requests.
 Update the relay-architecture branch of the client and rebuild it using the runtime setup below. Stop any MCP process using the same state file. Run node agent-adapter/dist/src/cli.js pair --replace. This explicitly requests a fresh pairing even if your local state remembers the old phone pairing; the previous local pairing is replaced only after the new code is authenticated and I confirm on the phone. Supply ONLY the AGW1 line below on standard input followed by a newline. Keep the process running while I return to Agent Gateway to confirm and authenticate.
-The setup line contains a private, single-use code that expires in thirty minutes. Never put it in command arguments, environment variables, shell history, logs or a saved skill. Discard it after pairing. If expired, ask me for a fresh setup message. Preserve existing agent identity/state.
+The setup line contains a private, single-use code that expires in thirty minutes. Never put it in command arguments, environment variables, shell history, logs or a saved skill. Discard it after pairing. If expired, ask me for a fresh setup prompt. Preserve existing agent identity/state.
 
 $setupLine
 

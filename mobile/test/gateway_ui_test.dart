@@ -108,7 +108,7 @@ void main() {
         .load();
   });
   testWidgets(
-    'one pairing button starts pairing and copies the complete setup message',
+    'one pairing button starts pairing and copies the complete setup prompt',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -180,25 +180,32 @@ void main() {
       expect(copied, contains(controller.pinPairing!.exchange.setupLine));
       expect(copied, contains('SKILL: Agent Gateway Gmail'));
       expect(copied, contains('pair --replace'));
-      expect(find.text('Copy setup message'), findsOneWidget);
+      expect(find.text('Copy setup prompt'), findsOneWidget);
+      expect(
+        find.text(
+          "Copied the setup prompt. Paste it into Muse's chatbox to continue",
+        ),
+        findsOneWidget,
+      );
+      expect(find.byType(SnackBar), findsNothing);
       expect(
         find.textContaining(controller.pinPairing!.exchange.code),
         findsNothing,
       );
       expectMinimalScreen();
-      await tester.tap(find.text('Copy setup message'));
+      await tester.tap(find.text('Copy setup prompt'));
       await tester.pumpAndSettle();
       expect(controller.starts, 1);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       await tester.pump();
-      expect(find.text('Copy setup message'), findsNothing);
+      expect(find.text('Copy setup prompt'), findsNothing);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
-      expect(find.text('Copy setup message'), findsOneWidget);
+      expect(find.text('Copy setup prompt'), findsOneWidget);
       await tester.tap(find.text('Cancel pairing'));
       await tester.pumpAndSettle();
       expect(controller.pinPairing, isNull);
@@ -251,6 +258,16 @@ void main() {
       await tester.pumpAndSettle();
       expectMinimalScreen();
       expect(source.fetches, 0);
+      expect(find.text('Paired'), findsOneWidget);
+      expect(find.text('Unpair'), findsOneWidget);
+      expect(find.text('Disconnect'), findsOneWidget);
+      expect(find.text('Copy Muse setup'), findsNothing);
+      expect(find.text('Unpair Muse'), findsNothing);
+      expect(find.text('Disconnect Gmail'), findsNothing);
+      expect(
+        tester.getCenter(find.text('Gmail')).dy,
+        tester.getCenter(find.text('Connected')).dy,
+      );
       expect(find.textContaining('Search:'), findsNothing);
       await tester.ensureVisible(find.text('Preview'));
       await tester.tap(find.text('Preview'));
@@ -283,8 +300,8 @@ void main() {
       expect(source.fetches, 1);
       expect(find.text('Another request'), findsNothing);
       expect(controller.pendingEntries, isEmpty);
-      await tester.ensureVisible(find.text('Disconnect Gmail'));
-      await tester.tap(find.text('Disconnect Gmail'));
+      await tester.ensureVisible(find.text('Disconnect'));
+      await tester.tap(find.text('Disconnect'));
       await tester.pumpAndSettle();
       expect(controller.connected, isFalse);
       expectMinimalScreen();

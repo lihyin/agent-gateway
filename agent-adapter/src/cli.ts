@@ -87,7 +87,7 @@ try {
     error instanceof Error && error.message === "already_paired"
       ? "This Muse state still remembers a pairing. Unpairing the iPhone does not erase this runtime's local state. Stop its MCP process, then run pair --replace with a fresh iPhone setup line to re-pair. Replacement requires the new code and phone confirmation.\n"
       : error instanceof Error && error.message === "relay_pairing_rejected"
-        ? "The relay rejected this pairing. If the iPhone was unpaired, obtain a fresh setup message and re-pair with pair --replace; then reconnect Gmail and enable Relay notifications on the phone. Local saved pairing state does not establish current relay access.\n"
+        ? "The relay rejected this pairing. If the iPhone was unpaired, obtain a fresh setup prompt and re-pair with pair --replace; then reconnect Gmail and enable Relay notifications on the phone. Local saved pairing state does not establish current relay access.\n"
         : error instanceof Error && error.message === "invalid_pairing_option"
           ? "Use pair or pair --replace, and provide the AGW1 setup line on standard input.\n"
           : "Operation failed. Check pairing, input, expiry, and state permissions.\n",

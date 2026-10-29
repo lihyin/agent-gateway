@@ -21,7 +21,11 @@ class GatewayController extends ChangeNotifier {
     required this.gmailConfigured,
     this.delivery,
     this.relay,
-  });
+  }) {
+    relay?.onAction = () {
+      if (ready && foreground) unawaited(reload());
+    };
+  }
   factory GatewayController.device(GatewayConfiguration configuration) {
     final vault = DeviceVault();
     final oauth = GmailOAuthConfiguration(configuration.googleIosClientId);
@@ -208,6 +212,7 @@ class GatewayController extends ChangeNotifier {
     rules = [];
     await review.cancelAll();
     await session.disconnect();
+    await relay?.clearNotifications();
   });
   Future<void> access(ReviewEntry entry, bool allow) => _run(() async {
     if (allow) {

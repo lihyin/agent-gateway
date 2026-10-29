@@ -13,7 +13,7 @@ Muse connector installation or publication.
 Use Node 22+, install this repository's dependencies with `npm ci`, and build with
 `npm run build --workspace agent-adapter`. Set `GATEWAY_AGENT_STATE` to a private,
 backup-excluded path inside Muse's runtime. On the iPhone tap **Pair with Muse**,
-copy its setup message to your trusted Muse conversation, then run:
+copy its setup prompt to your trusted Muse conversation, then run:
 
 ```sh
 node agent-adapter/dist/src/cli.js pair
@@ -69,7 +69,7 @@ profiles are provider setup blockers, not something an unsigned test can establi
 Install the new app, connect Gmail and complete pairing. Enable **Relay
 notifications** and confirm locally, then accept iOS notification permission. The
 phone registers its current APNs token automatically. Muse needs only the original
-Gmail skill/setup message and its paired state; there is no delivery route to paste.
+Gmail skill/setup prompt and its paired state; there is no delivery route to paste.
 The app updates registration on startup, returning to the foreground, and token
 changes detected while active. A stale token can require reopening the app; iOS
 background execution is not guaranteed. No daily action is needed.
