@@ -287,9 +287,17 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
 
   Widget _connectionTitle(String name, String status) => Row(
     children: [
-      Text(name),
-      const SizedBox(width: 12),
       Flexible(
+        child: Text(
+          name,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      const SizedBox(width: 8),
+      Flexible(
+        flex: 2,
         child: Text(
           status,
           maxLines: 1,
