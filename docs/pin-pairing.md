@@ -88,6 +88,19 @@ is still enforced for sensitive requests without a separate explanatory banner.
 
 ## Recovery
 
+If the phone reports that the connection ended, tap **Pair with Muse** again.
+The phone clears the interrupted attempt and copies a fresh setup prompt; no
+manual unpairing, Gmail disconnect or configuration change is needed. A local
+pair is marked unconfirmed until the authenticated final acknowledgment arrives,
+so unfinished pairing remains recoverable after restarting the app. Retry also
+handles interrupted attempts saved by older app versions while that attempt is
+still visible. Completed pairings are preserved and require explicit Unpair.
+
+Recovery attempts relay revocation and always invalidates the abandoned local
+epoch before creating a new session. A relay that never received the incomplete
+record cannot block local recovery; requests for its old epoch remain rejected.
+Device identity is preserved, and retrying grants no Gmail access.
+
 Ordinary users can unpair/disconnect and reconnect from the phone. Phone unpairing
 revokes relay access but cannot delete the private state file in Muse's runtime.
 A fresh phone setup prompt explicitly instructs the updated client to run

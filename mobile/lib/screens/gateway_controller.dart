@@ -14,6 +14,13 @@ import '../transport/foreground_relay.dart';
 import '../transport/pin_pairing.dart';
 import '../vault/vault.dart';
 
+typedef PairingFactory = PinPairing Function(
+  PinExchange exchange,
+  PairedDelivery delivery, {
+  required void Function() changed,
+  required Future<bool> Function() confirm,
+});
+
 class GatewayController extends ChangeNotifier {
   GatewayController({
     required this.session,
@@ -21,6 +28,7 @@ class GatewayController extends ChangeNotifier {
     required this.gmailConfigured,
     this.delivery,
     this.relay,
+    this.pairingFactory = PinPairing.new,
   }) {
     relay?.onAction = () {
       if (ready && foreground) unawaited(reload());
@@ -55,22 +63,42 @@ class GatewayController extends ChangeNotifier {
   final bool gmailConfigured;
   final PairedDelivery? delivery;
   final ForegroundRelay? relay;
+  final PairingFactory pairingFactory;
   PinPairing? pinPairing;
-  Future<void> startPinPairing(Future<bool> Function() confirm) =>
-      _run(() async {
-        if (relay == null || delivery == null || delivery!.agentId != null) {
-          throw const GatewayError('relay_configuration_required');
-        }
+  Future<void> startPinPairing(Future<bool> Function() confirm) => _run(
+    () async {
+      if (relay == null || delivery == null) {
+        throw const GatewayError('relay_configuration_required');
+      }
+      if (delivery!.agentId != null) {
+        final interrupted =
+            pinPairing?.status == 'failed' ||
+            (pinPairing == null && !delivery!.pairingConfirmed);
+        if (!interrupted) throw const GatewayError('pairing_already_complete');
         pinPairing?.close();
-        final pairing = PinPairing(
-          PinExchange(relay!.origin),
-          delivery!,
-          changed: _notify,
-          confirm: confirm,
-        );
-        pinPairing = pairing;
-        await pairing.start();
-      });
+        try {
+          await relay!.revoke(delivery!);
+        } on GatewayError catch (error) {
+          if (error.code != 'relay_unavailable') rethrow;
+          // The relay may never have received this incomplete pair record.
+          // Local epoch revocation still rejects all old agent requests.
+        }
+        await delivery!.unpair();
+        await review.cancelAll();
+        await relay!.clearNotifications();
+        await _reload();
+      }
+      pinPairing?.close();
+      final pairing = pairingFactory(
+        PinExchange(relay!.origin),
+        delivery!,
+        changed: _notify,
+        confirm: confirm,
+      );
+      pinPairing = pairing;
+      await pairing.start();
+    },
+  );
   void cancelPinPairing() {
     pinPairing?.close();
     pinPairing = null;
@@ -81,7 +109,7 @@ class GatewayController extends ChangeNotifier {
   bool get relayEnabled =>
       relay != null && (delivery?.relayEnabled(relay!.origin) ?? false);
   bool get pairingComplete =>
-      delivery?.agentId != null &&
+      delivery?.pairingConfirmed == true &&
       (pinPairing == null || pinPairing!.status == 'paired');
   String? get museSkill => relay == null || delivery?.agentId == null
       ? null

@@ -29,6 +29,7 @@ class PairedDelivery {
   String? epoch(String id) =>
       _ready && (_pair?['agentId']) == id ? (_pair?['epoch'] as String?) : null;
   String? get agentId => _ready ? (_pair?['agentId'] as String?) : null;
+  bool get pairingConfirmed => agentId != null && _pair?['confirmed'] != false;
   String? get agentFingerprint =>
       _ready && _pair != null ? hash(_pair!['identity']) : null;
   String? get deviceFingerprint =>
@@ -88,6 +89,7 @@ class PairedDelivery {
     String expectedFingerprint, {
     bool Function()? stillAuthorized,
     String? confirmationReason,
+    bool pendingConfirmation = false,
   }) => _serial.run(() async {
     _check();
     if (_pair != null || offer.length > 5000) {
@@ -156,6 +158,7 @@ class PairedDelivery {
         'agentId': identityId(public),
         'identity': public,
         'epoch': epoch,
+        if (pendingConfirmation) 'confirmed': false,
       };
       await _save('transport.pair', pair);
       _pair = pair;
@@ -166,6 +169,16 @@ class PairedDelivery {
       throw const GatewayError('invalid_pairing');
     }
   });
+  Future<void> confirmPairing(String epoch) => _serial.run(() async {
+    _check();
+    if (_pair == null || _pair!['epoch'] != epoch) {
+      throw const GatewayError('invalid_pairing');
+    }
+    final confirmed = {..._pair!, 'confirmed': true};
+    await _save('transport.pair', confirmed);
+    _pair = confirmed;
+  });
+
   Future<void> unpair() => _serial.run(() async {
     _check();
     _pair = null; // Local revocation precedes storage I/O, including failure.
@@ -186,7 +199,7 @@ class PairedDelivery {
           await vault.delete('transport.relay');
           return;
         }
-        if (_pair == null) throw const GatewayError('unpaired');
+        if (!pairingConfirmed) throw const GatewayError('unpaired');
         if (!await confirmation.confirm(
           'Enable encrypted relay delivery to the paired agent? Allowed results will be sent automatically while this app is open.',
         )) {

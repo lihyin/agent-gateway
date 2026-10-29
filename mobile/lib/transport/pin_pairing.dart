@@ -259,6 +259,7 @@ class PinPairing {
   bool _closed = false;
   Future<void> _tail = Future.value();
   int _received = 0;
+  String? _savedEpoch;
   Future<void> start() async {
     try {
       final connection = connectPairingSocket(
@@ -346,10 +347,12 @@ class PinPairing {
         compact,
         hash(payload['identity']),
         confirmationReason: 'Pair with Muse using the verified one-time code',
+        pendingConfirmation: true,
         stillAuthorized: () =>
             !_closed &&
             exchange.expiresAt > DateTime.now().millisecondsSinceEpoch ~/ 1000,
       );
+      _savedEpoch = delivery.epoch(delivery.agentId!);
       if (_closed) return;
       exchange.check();
       status = 'finishing';
@@ -376,6 +379,10 @@ class PinPairing {
     } else if (status == 'finishing') {
       exactKeys(frame, {'jwe'});
       await exchange.open(frame['jwe'] as String, 'complete');
+      if (_closed) return;
+      exchange.check();
+      await delivery.confirmPairing(_savedEpoch!);
+      if (_closed) return;
       status = 'paired';
       close();
     } else {

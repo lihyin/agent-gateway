@@ -802,7 +802,10 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
     'pairing_failed' => 'The pairing attempt failed. Cancel and generate a fresh code on the iPhone.',
     'pairing_cancelled' =>
       'Pairing was declined. Generate a fresh code to try again.',
-    'pairing_interrupted' => 'The connection ended. Check whether Muse paired; otherwise unpair and try a fresh code.',
+    'pairing_interrupted' =>
+      'The connection ended. Tap Pair with Muse to try again.',
+    'pairing_already_complete' =>
+      'Muse is already paired. Unpair before starting a new connection.',
     'pairing_unavailable' => 'Cannot reach pairing on the relay. Check connectivity and that the new relay version is deployed.',
     'invalid_pairing' => 'Pairing failed. Try a new setup prompt.',
     'invalid_envelope' =>
