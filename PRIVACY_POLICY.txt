@@ -1,0 +1,156 @@
+AGENT GATEWAY PRIVACY POLICY
+Effective date: October 31, 2026
+
+PUBLICATION NOTE: Replace [OPERATOR LEGAL NAME] and [PRIVACY CONTACT EMAIL]
+with the app operator's verified details before publishing this policy.
+
+1. WHO WE ARE
+
+Agent Gateway is operated by [OPERATOR LEGAL NAME] ("we", "us"). It lets
+you review requests from a paired Muse client for selected Gmail information
+and decide what to share. This policy describes the iOS app and its associated
+relay service. It does not replace the privacy policies of Google, Apple,
+Cloudflare, Muse, or another service you choose to use.
+
+Privacy contact: [PRIVACY CONTACT EMAIL]
+
+2. INFORMATION THE APP HANDLES
+
+Gmail access. If you connect Gmail, Google handles your sign-in and consent.
+Agent Gateway receives OAuth access and refresh tokens so it can make the
+authorized Gmail API requests directly from your device. The app does not
+receive or store your Google password. Gmail tokens stay in device-local
+secure storage and are not sent to the relay or your paired agent.
+
+Email information. Following source-access approval, the app can retrieve
+bounded search results with selected fields such as message identifiers,
+dates, senders, subjects, and short snippets. The current app does not retrieve
+attachments or full message bodies and does not send, delete, or modify mail.
+Search terms, request purposes, date ranges, and requested fields are processed
+to prepare the review and enforce its scope.
+
+Pairing and security information. The app creates device keys and pairing
+identifiers. The relay stores public device and agent pairing records,
+encrypted notification destinations, update timestamps, rate-control records,
+and revoked pairing identifiers. Device private keys remain on your device.
+These records are used to authenticate requests, deliver notifications, prevent
+replay and abuse, and honor pairing revocation.
+
+Notification and delivery information. With notifications enabled, Apple Push
+Notification service (APNs) handles a device push token and encrypted request
+delivery. The relay processes encrypted requests and results. Notifications
+use generic alert text rather than email content. The device temporarily
+stores encrypted incoming requests until they are imported or expire.
+
+Local review records. The app stores request state, proposed disclosures,
+approval decisions, saved approval rules, and a limited local audit history
+to support review, expiry, and replay protection.
+
+Network information. Connections to Google, Apple, and the relay necessarily
+expose network information such as IP addresses and connection timing to the
+services handling those connections. Infrastructure providers may process
+operational and security information under their own policies and settings.
+
+3. HOW INFORMATION IS USED AND SHARED
+
+We use information to connect Gmail, pair your selected agent, deliver requests,
+prepare previews, apply your decisions, return approved results, and protect
+the service against unauthorized use.
+
+You authorize source access before the app fetches email information. You can
+then review the proposed disclosure, remove fields or shorten text, share once,
+or deny the request. Where offered, a saved approval applies only to its exact
+scope and has a limited lifetime. Additional device authentication may be
+required for sensitive fields. Automatic filtering is best effort and may miss
+sensitive information; inspect the preview before sharing.
+
+Requests and results are encrypted between the paired endpoints. The relay
+forwards encrypted content and does not have the endpoint private keys needed
+to decrypt email previews or approved results. It does not have Gmail tokens
+or authority to fetch your email or approve disclosure.
+
+When you approve sharing, the paired Muse client receives and decrypts the
+approved information to carry out your request. This is a transfer to the
+recipient you paired. Review that service's privacy practices, account settings,
+and retention policies before sharing. Agent Gateway cannot recall information
+already delivered to another service.
+
+Google provides Gmail authentication and email APIs. Apple provides iOS
+security services and push notifications. Cloudflare hosts the relay and its
+pairing registry. These providers process the information necessary for those
+functions and may process it in countries other than your own.
+
+The app has no advertising SDK or third-party product-analytics SDK in its
+current implementation. We do not sell Gmail information, use it for advertising,
+or use it to train generalized artificial-intelligence or machine-learning
+models. Agent Gateway's use and transfer of information received from Google
+APIs will adhere to the Google API Services User Data Policy and the Google
+Workspace API User Data and Developer Policy, including their Limited Use
+requirements. User-directed sharing supports the requested user-facing feature;
+it does not authorize advertising, resale, or generalized model training.
+
+4. STORAGE AND RETENTION
+
+On iOS, credentials, private keys, and review state use device-local Keychain
+storage configured to be accessible when the device is unlocked and without
+iCloud synchronization. The encrypted notification inbox uses a backup-excluded
+file with iOS file protection. Previews are obscured when the app becomes
+inactive. No storage or transmission method guarantees absolute security.
+
+Requests expire after a bounded period, generally no more than five minutes.
+Saved approval rules last at most 24 hours. Local request and replay records
+are pruned according to the app's expiry rules, generally within 24 hours after
+request expiry when cleanup runs. The local review audit is capped at 100
+events and seven days. Cleanup occurs during app processing or initialization;
+closing the app does not guarantee immediate physical deletion of every record.
+
+The relay coordinates live encrypted delivery without a persistent email
+message or result mailbox. Active pairing and encrypted destination records
+are retained to support the connection until replaced, disabled, or revoked
+as applicable. Revoked pairing records and security counters can remain for
+replay prevention; the current registry does not assign them a fixed automatic
+deletion period. Provider operational records follow the provider's applicable
+retention practices. Data received by your paired agent follows that recipient's
+retention practices.
+
+5. YOUR CHOICES AND DELETION
+
+You can deny requests, edit proposed disclosures, reset saved approvals,
+disconnect Gmail, unpair Muse, or turn off notifications in the app or iOS
+settings. Disconnecting Gmail removes locally stored Gmail credentials and
+clears the app's source-review state. The app attempts to revoke Google access;
+if that request cannot complete, revoke the grant in your Google Account's
+third-party access settings as well.
+
+Unpairing removes the local pairing and attempts to revoke the relay pairing
+and notification route. A network failure can delay remote cleanup. Previously
+shared information remains with the recipient unless that recipient deletes it.
+Deleting the app should not be relied on as the only way to revoke Google access
+or remove relay records; disconnect and unpair first when possible.
+
+For privacy questions or requests to access, correct, or delete information
+held by the operator, contact [PRIVACY CONTACT EMAIL]. We may need information
+to verify your request and identify relevant pairing records. Do not send
+passwords, OAuth tokens, private keys, or email content in a support request.
+Some security records may need to be retained to prevent replay or meet
+applicable legal obligations. We will explain relevant limitations when
+responding to a request.
+
+6. CLIPBOARD AND EXTERNAL SERVICES
+
+When you use setup-copy actions, pairing instructions, a temporary code, or
+agent configuration can be written to the system clipboard for you to paste
+into your trusted Muse session. Clipboard contents and the destination chat
+are outside the app's secure vault and may be retained or synchronized by
+your device or the receiving service. Treat a pairing code as confidential.
+The app does not automatically paste or send clipboard contents to Muse.
+
+7. POLICY CHANGES
+
+We will update the effective date when this policy changes. Material changes
+to data access or sharing will be communicated through an appropriate notice
+and, where required, a new consent request before the changed processing.
+
+Google policies:
+https://developers.google.com/terms/api-services-user-data-policy
+https://developers.google.com/workspace/workspace-api-user-data-developer-policy
