@@ -247,11 +247,13 @@ class PinPairing {
     this.delivery, {
     required this.changed,
     required this.confirm,
+    this.connect = connectPairingSocket,
   });
   final PinExchange exchange;
   final PairedDelivery delivery;
   final void Function() changed;
   final Future<bool> Function() confirm;
+  final Future<WebSocket> Function(Uri) connect;
   WebSocket? _socket;
   Timer? _timer;
   String status = 'connecting';
@@ -262,7 +264,7 @@ class PinPairing {
   String? _savedEpoch;
   Future<void> start() async {
     try {
-      final connection = connectPairingSocket(
+      final connection = connect(
         Uri.parse(
           '${exchange.origin.replaceFirst('https:', 'wss:')}/v1/pairing/${exchange.session}/device',
         ),
@@ -299,14 +301,20 @@ class PinPairing {
               .catchError((Object _) => _fail('pairing_failed'));
         },
         onDone: () {
-          if (!_closed) _fail('pairing_interrupted');
+          _endConnection('pairing_interrupted');
         },
-        onError: (Object _) => _fail('pairing_unavailable'),
+        onError: (Object _) => _endConnection('pairing_unavailable'),
       );
       changed();
     } catch (_) {
       _fail('pairing_unavailable');
     }
+  }
+
+  void _endConnection(String code) {
+    // A peer can close immediately after sending complete. Drain received
+    // frames, including asynchronous validation and persistence, first.
+    _tail = _tail.then((_) => _fail(code));
   }
 
   Future<void> _message(dynamic data) async {

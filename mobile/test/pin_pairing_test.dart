@@ -10,7 +10,104 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fakes.dart';
 
+class _PairingSocket extends Stream<dynamic> implements WebSocket {
+  final incoming = StreamController<dynamic>();
+  final sent = StreamController<dynamic>();
+  @override
+  StreamSubscription<dynamic> listen(
+    void Function(dynamic)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) => incoming.stream.listen(
+    onData,
+    onError: onError,
+    onDone: onDone,
+    cancelOnError: cancelOnError,
+  );
+  @override
+  void add(dynamic data) => sent.add(data);
+  @override
+  Future<void> close([int? code, String? reason]) async {}
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _CompletionExchange extends PinExchange {
+  _CompletionExchange(this.offer) : super('https://relay.example.com');
+  final String offer;
+  final completing = Completer<void>();
+  final finish = Completer<void>();
+  @override
+  void authenticate(Map<String, dynamic> proof) {}
+  @override
+  String seal(String kind, [Map<String, dynamic> data = const {}]) => kind;
+  @override
+  Future<Map<String, dynamic>> open(String compact, String kind) async {
+    if (kind == 'complete') {
+      completing.complete();
+      await finish.future;
+    }
+    return {'offer': offer};
+  }
+}
+
 void main() {
+  for (final completes in [true, false]) {
+    test('socket close drains final frame; completes=$completes', () async {
+      final fixture = jsonDecode(
+        File('../protocol/fixtures/pairing.json').readAsStringSync(),
+      );
+      final delivery = PairedDelivery(
+        vault: MemoryVault(),
+        confirmation: FakeConfirmation(),
+        clock: () => DateTime.fromMillisecondsSinceEpoch(100000, isUtc: true),
+        keyGenerator: () async => Map<String, dynamic>.from(fixture['device']),
+      );
+      await delivery.initialize();
+      final socket = _PairingSocket();
+      final exchange = _CompletionExchange(fixture['offer']);
+      final finished = Completer<void>();
+      late PinPairing pairing;
+      pairing = PinPairing(
+        exchange,
+        delivery,
+        connect: (_) async => socket,
+        confirm: () async => true,
+        changed: () {
+          if (['paired', 'failed'].contains(pairing.status) &&
+              !finished.isCompleted) {
+            finished.complete();
+          }
+        },
+      );
+      addTearDown(pairing.close);
+      final outgoing = StreamIterator(socket.sent.stream);
+      addTearDown(outgoing.cancel);
+      await pairing.start();
+      socket.incoming.add(jsonEncode({'kind': 'joined'}));
+      await outgoing.moveNext(); // challenge
+      socket.incoming.add('{}');
+      await outgoing.moveNext(); // ready
+      socket.incoming.add(jsonEncode({'jwe': 'offer'}));
+      await outgoing.moveNext(); // receipt
+      if (completes) {
+        socket.incoming.add(jsonEncode({'jwe': 'complete'}));
+        await exchange.completing.future;
+      }
+      await socket.incoming.close();
+      await Future<void>.delayed(Duration.zero);
+      if (completes) {
+        expect(pairing.status, 'finishing');
+        exchange.finish.complete();
+      }
+      await finished.future.timeout(const Duration(seconds: 5));
+      expect(pairing.status, completes ? 'paired' : 'failed');
+      expect(pairing.error, completes ? isNull : 'pairing_interrupted');
+      expect(delivery.pairingConfirmed, completes);
+    });
+  }
+
   test('pairing WebSocket upgrade works and rejects redirects', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     var redirected = false;

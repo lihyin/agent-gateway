@@ -1,6 +1,6 @@
 # Agent Gateway app icon
 
-`app-icon.svg` is the editable master: a solid sky-blue (`#55B9EE`) shield with
+`app-icon.svg` is the editable master: a solid darker sky-blue (`#168AC4`) shield with
 a white check on pure white (`#FFFFFF`). It follows the user's shield reference.
 The shield has approximately 8% top and bottom margins.
 

@@ -33,7 +33,7 @@ void main() {
           expect(bytes.sublist(0, 4), [255, 255, 255, 255]);
           // Uniform sky blue in the shield's upper center, not Flutter artwork.
           final offset = (size * (size * 0.3).floor() + size ~/ 2) * 4;
-          expect(bytes.sublist(offset, offset + 4), [85, 185, 238, 255]);
+          expect(bytes.sublist(offset, offset + 4), [22, 138, 196, 255]);
         } finally {
           image.dispose();
           codec.dispose();
