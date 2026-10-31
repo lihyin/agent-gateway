@@ -1,4 +1,35 @@
 workflows:
+  ios-inspect:
+    name: Inspect existing Apple build without rebuilding
+    max_build_duration: 20
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: agent-gateway-asc
+    environment:
+      groups: [production_mobile]
+    scripts:
+      - name: Read existing App Store Connect build status
+        script: |
+          set -eu
+          test "$(git rev-parse HEAD)" = "$EXPECTED_REVISION"
+          test -n "$APP_STORE_ID"
+          test -n "$INSPECT_BUILD_NUMBER"
+          app-store-connect builds list --app-id "$APP_STORE_ID" --build-version-number "$INSPECT_BUILD_NUMBER" --json --silent > apple-build.json
+          python3 - <<'PY'
+          import json, os
+          with open('apple-build.json') as handle:
+              payload = json.load(handle)
+          rows = payload if isinstance(payload, list) else payload.get('data', [])
+          report = {'revision': os.environ['EXPECTED_REVISION'], 'buildNumber': os.environ['INSPECT_BUILD_NUMBER'], 'builds': []}
+          for row in rows:
+              attributes = row.get('attributes', {})
+              report['builds'].append({key: attributes.get(key) for key in ['version', 'processingState', 'expired', 'usesNonExemptEncryption', 'uploadedDate']})
+          with open('testflight-inspection.json', 'w') as handle:
+              json.dump(report, handle)
+          print(json.dumps(report))
+          PY
+    artifacts:
+      - testflight-inspection.json
   android-bootstrap:
     name: Initial signed Android artifacts for Play Console setup
     max_build_duration: 90
