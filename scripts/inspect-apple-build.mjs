@@ -1,4 +1,5 @@
 import { writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 
 for (const key of [
   "CM_API_TOKEN",
@@ -66,9 +67,11 @@ for (let attempt = 0; attempt < 90; attempt++) {
   if (build.status === "finished") {
     if (build.commit?.hash !== process.env.EXPECTED_REVISION)
       throw new Error("Inspection revision mismatch");
-    const artifact = build.artifacts?.find(
-      (item) => item.name.split("/").pop() === "testflight-inspection.json",
-    );
+    const artifact =
+      build.artifacts?.find(
+        (item) => item.name.split("/").pop() === "testflight-inspection.json",
+      ) ??
+      build.artifacts?.find((item) => item.name.endsWith("_artifacts.zip"));
     if (
       !artifact?.short_lived_download_url ||
       new URL(artifact.short_lived_download_url).protocol !== "https:"
@@ -86,7 +89,32 @@ for (let attempt = 0; attempt < 90; attempt++) {
     });
     if (!response.ok)
       throw new Error(`Inspection artifact HTTP ${response.status}`);
-    const report = await response.json();
+    let report;
+    if (artifact.name.endsWith(".zip")) {
+      const unpacked = spawnSync(
+        "python3",
+        [
+          "-c",
+          [
+            "import io, sys, zipfile",
+            "with zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read())) as archive:",
+            "    matches = [n for n in archive.namelist() if n.split('/')[-1] == 'testflight-inspection.json']",
+            "    assert len(matches) == 1, 'Inspection report missing or ambiguous'",
+            "    assert archive.getinfo(matches[0]).file_size < 1048576, 'Inspection report too large'",
+            "    sys.stdout.buffer.write(archive.read(matches[0]))",
+          ].join("\n"),
+        ],
+        {
+          input: Buffer.from(await response.arrayBuffer()),
+          maxBuffer: 1048576,
+        },
+      );
+      if (unpacked.status !== 0)
+        throw new Error("Cannot read bundled inspection report");
+      report = JSON.parse(unpacked.stdout.toString());
+    } else {
+      report = await response.json();
+    }
     if (
       report.revision !== process.env.EXPECTED_REVISION ||
       report.buildNumber !== number ||
