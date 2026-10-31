@@ -1,0 +1,119 @@
+AGENT GATEWAY TERMS OF SERVICE
+Effective date: October 31, 2026
+
+1. Acceptance and scope
+
+These Terms govern your use of the Agent Gateway application and relay services
+provided by the operator of your Agent Gateway deployment (the "Service"). By
+using the Service, you agree to these Terms. If you do not agree, do not use the
+Service. You must have the legal capacity and authority to accept these Terms,
+including on behalf of any organization whose accounts or data you connect.
+
+2. What the Service does
+
+Agent Gateway connects your device with a paired agent, such as Meta Muse, to
+request limited Gmail information. The app provides controls for authorizing
+source access, reviewing results, and approving or denying disclosure. A relay
+transports encrypted requests and results and supports notifications.
+
+Availability and supported features depend on your app version, device,
+deployment configuration, and third-party services. Beta and TestFlight releases
+may contain errors, change, or become unavailable.
+
+3. Your accounts and approvals
+
+Only connect accounts and disclose information you are authorized to access and
+share. You are responsible for securing your device, account credentials, pairing
+codes, and paired agents. Review pairing details, requested access, previews, and
+any approval rules before accepting them. Remove pairings and revoke permissions
+when they are no longer needed or you suspect unauthorized access.
+
+Source access consent and disclosure approval serve different purposes. Granting
+access allows retrieval under the app's controls; disclosure approval permits
+sharing the approved result with the paired agent. Saved approval rules may
+permit disclosure within the rule's scope until the rule expires or is revoked.
+
+4. Information and privacy
+
+The app is designed to keep Gmail credentials and device private keys on your
+device and to encrypt private request and result payloads in transit through the
+relay. The relay handles operational information needed for routing, pairing,
+and notification delivery. These design features do not guarantee that every
+device, recipient, or deployment is secure.
+
+Filtering and redaction may miss sensitive information. You remain responsible
+for reviewing what you share. Once a recipient receives approved information,
+Agent Gateway cannot guarantee its deletion or control the recipient's storage,
+use, or onward disclosure. Review the recipient's terms and privacy practices.
+These Terms do not replace any applicable privacy notice.
+
+5. Acceptable use
+
+Do not use the Service to violate applicable law or another person's rights;
+access accounts without permission; steal credentials or data; send malicious
+requests or software; bypass consent, approval, authentication, or security
+controls; or disrupt the Service or its providers. Do not misrepresent your
+identity, authority, or the purpose of a request.
+
+6. Third-party services
+
+Google, Apple, Meta Muse, hosting providers, and other third parties operate
+independently and may impose their own terms, policies, limits, and charges.
+Their availability and behavior are outside the Service operator's control.
+Mentioning a third party does not imply its endorsement of Agent Gateway.
+You are responsible for evaluating information or actions produced by a paired
+agent before relying on them.
+
+7. Ownership and software license
+
+You retain your rights in your information. You authorize processing and
+transmission of that information as necessary to carry out your requests and
+approvals and operate the Service, subject to applicable privacy commitments.
+These Terms do not transfer ownership of your information.
+
+The repository's source code is separately licensed under the Apache License,
+Version 2.0, as provided in LICENSE. These Terms do not limit rights granted by
+that license. Third-party components remain subject to their own licenses.
+
+8. Availability, suspension, and stopping use
+
+The Service may change or be interrupted for maintenance, security, provider
+changes, or other operational reasons. The operator may restrict or suspend
+access to address misuse, security threats, or legal requirements.
+
+You may stop using the Service at any time. You can disconnect Gmail, revoke
+Google account access, remove pairings and saved approval rules, and uninstall
+the app. These actions do not recall information already delivered to recipients
+or necessarily delete records held independently by third-party providers.
+
+9. Disclaimers
+
+To the extent permitted by applicable law, the Service is provided "as is" and
+"as available," without warranties of any kind, including merchantability,
+fitness for a particular purpose, and non-infringement. The operator does not
+guarantee uninterrupted availability, error-free operation, complete filtering,
+or the accuracy or suitability of results supplied by third parties or agents.
+
+10. Limitation of liability
+
+To the extent permitted by applicable law, the operator is not liable for
+indirect, incidental, special, consequential, or punitive damages, or loss of
+profits, data, or business opportunities arising from use of the Service.
+Nothing in these Terms excludes or limits liability that cannot lawfully be
+excluded or limited, or waives mandatory consumer rights or remedies.
+
+11. Changes to these Terms
+
+Updated Terms will be made available with a revised effective date. Material
+changes will be communicated through the app, repository, or another available
+Service notice before they take effect where required by law. If you do not
+agree to updated Terms, stop using the Service.
+
+12. Contact
+
+For questions about these Terms or the project, contact the maintainers through:
+https://github.com/lihyin/agent-gateway/issues
+
+For a separately operated deployment, contact that deployment's operator about
+its service. Do not post credentials, private email content, pairing codes, or
+other sensitive information in public issues.
