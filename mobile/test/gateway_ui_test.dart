@@ -340,7 +340,11 @@ void main() {
       expect(find.text('Disconnect Gmail'), findsNothing);
       expect(
         tester.getCenter(find.text('Gmail')).dy,
-        tester.getCenter(find.text('Connected')).dy,
+        lessThan(tester.getCenter(find.text('Connected')).dy),
+      );
+      expect(
+        tester.getCenter(find.text('Muse')).dy,
+        lessThan(tester.getCenter(find.text('Paired')).dy),
       );
       expect(find.textContaining('Search:'), findsNothing);
       await tester.ensureVisible(find.text('Preview'));
@@ -349,7 +353,9 @@ void main() {
       expect(source.fetches, 1);
       expect(find.textContaining('Invoice for [redacted]'), findsOneWidget);
       expect(find.byType(CircleAvatar), findsOneWidget);
-      await tester.ensureVisible(find.text('Share once'));
+      expect(find.text('Edit'), findsNothing);
+      expect(find.text('Share once'), findsNothing);
+      await tester.ensureVisible(find.text('Allow'));
       await tester.pumpAndSettle();
       await tester.runAsync(() async {
         final boundary = tester.renderObject<RenderRepaintBoundary>(
@@ -376,8 +382,8 @@ void main() {
       await tester.ensureVisible(find.text('Details'));
       await tester.tap(find.text('Details'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Share once'));
-      await tester.tap(find.text('Share once'));
+      await tester.ensureVisible(find.text('Allow'));
+      await tester.tap(find.text('Allow'));
       await tester.pumpAndSettle();
       expect((await review.entries()).single.state, ReviewState.allowed);
       expect(find.text('Find my invoice'), findsNothing);

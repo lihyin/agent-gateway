@@ -102,61 +102,6 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _edit(ReviewEntry entry) async {
-    final fields = entry.candidate
-        .map(
-          (item) =>
-              TextEditingController(text: item['subject'] as String? ?? ''),
-        )
-        .toList();
-    final yes = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reduce the disclosure'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Shorten or remove subjects. Edits cannot widen scope.',
-              ),
-              for (var i = 0; i < fields.length; i++)
-                TextField(
-                  controller: fields[i],
-                  decoration: InputDecoration(labelText: 'Subject ${i + 1}'),
-                ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Allow edited preview'),
-          ),
-        ],
-      ),
-    );
-    if (yes == true) {
-      final edited = entry.candidate
-          .map((m) => Map<String, dynamic>.from(m))
-          .toList();
-      for (var i = 0; i < fields.length; i++) {
-        if (edited[i].containsKey('subject')) {
-          edited[i]['subject'] = fields[i].text;
-        }
-      }
-      await widget.controller.decide(entry, ReviewAction.edit, edited: edited);
-    }
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    for (final field in fields) {
-      field.dispose();
-    }
-  }
-
   Future<bool> _confirmPairing() async {
     final pairing = widget.controller.pinPairing;
     if (pairing == null) return false;
@@ -273,7 +218,8 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
       return Card(
         child: ListTile(
           leading: const Icon(Icons.link_rounded),
-          title: _connectionTitle('Muse', 'Paired'),
+          title: const Text('Muse'),
+          subtitle: const Text('Paired'),
           trailing: TextButton(
             onPressed: c.busy
                 ? null
@@ -353,30 +299,6 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
       ),
     );
   }
-
-  Widget _connectionTitle(String name, String status) => Row(
-    children: [
-      Flexible(
-        child: Text(
-          name,
-          maxLines: 1,
-          softWrap: false,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      const SizedBox(width: 8),
-      Flexible(
-        flex: 2,
-        child: Text(
-          status,
-          maxLines: 1,
-          softWrap: false,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      ),
-    ],
-  );
 
   String _fieldLabel(String field) => switch (field) {
     'id' => 'Message ID',
@@ -583,7 +505,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                             entry,
                             ReviewAction.allow,
                           ),
-                    child: const Text('Share once'),
+                    child: const Text('Allow'),
                   ),
                   TextButton(
                     onPressed: busy
@@ -593,10 +515,6 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                             ReviewAction.deny,
                           ),
                     child: const Text('Deny'),
-                  ),
-                  TextButton(
-                    onPressed: busy ? null : () => _edit(entry),
-                    child: const Text('Edit'),
                   ),
                 ],
               ),
@@ -660,8 +578,8 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                         Card(
                           child: ListTile(
                             leading: const Icon(Icons.mail_outline_rounded),
-                            title: _connectionTitle(
-                              'Gmail',
+                            title: const Text('Gmail'),
+                            subtitle: Text(
                               c.connected ? 'Connected' : 'Not connected',
                             ),
                             trailing: TextButton(
