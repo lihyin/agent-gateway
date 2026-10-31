@@ -37,6 +37,7 @@ class PairedDelivery {
   bool relayEnabled(String origin) =>
       _ready &&
       _pair != null &&
+      _relay?['enabled'] != false &&
       _relay?['epoch'] == _pair?['epoch'] &&
       _relay?['origin'] == origin;
   Future<void> initialize() => _serial.run(() async {
@@ -195,8 +196,13 @@ class PairedDelivery {
       _serial.run(() async {
         _check();
         if (!enabled) {
-          _relay = null;
-          await vault.delete('transport.relay');
+          final value = {
+            'epoch': _pair?['epoch'],
+            'origin': origin,
+            'enabled': false,
+          };
+          await _save('transport.relay', value);
+          _relay = value;
           return;
         }
         if (!pairingConfirmed) throw const GatewayError('unpaired');
@@ -209,6 +215,15 @@ class PairedDelivery {
         await _save('transport.relay', value);
         _relay = value;
       });
+  Future<void> enableRelayByDefault(String origin) => _serial.run(() async {
+    _check();
+    // A confirmed pairing enables notifications unless the user already chose.
+    // Persist explicit opt-outs so reloads and restarts cannot undo them.
+    if (!pairingConfirmed || _relay != null) return;
+    final value = {'epoch': _pair!['epoch'], 'origin': origin};
+    await _save('transport.relay', value);
+    _relay = value;
+  });
   // Self-registration frame for the relay's PairingRegistry: the pair
   // record (public transport configuration) plus a device-signed proof
   // (typ agw+pair-register) binding the record's IDs and epoch to this

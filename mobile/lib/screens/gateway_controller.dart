@@ -92,7 +92,10 @@ class GatewayController extends ChangeNotifier {
       final pairing = pairingFactory(
         PinExchange(relay!.origin),
         delivery!,
-        changed: _notify,
+        changed: () {
+          _notify();
+          if (pinPairing?.status == 'paired') unawaited(reload());
+        },
         confirm: confirm,
       );
       pinPairing = pairing;
@@ -207,6 +210,9 @@ class GatewayController extends ChangeNotifier {
   }
 
   Future<void> _sync() async {
+    if (foreground && pairingComplete && relay != null) {
+      await delivery!.enableRelayByDefault(relay!.origin);
+    }
     if (foreground && relayEnabled) await relay!.refreshRegistration(delivery!);
     if (foreground && connected && relayEnabled) {
       await relay!.sync(delivery!, review);

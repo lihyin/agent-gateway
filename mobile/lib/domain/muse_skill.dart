@@ -8,13 +8,13 @@ String museGmailSkill({
 SKILL: Agent Gateway Gmail (v1)
 Use my paired Agent Gateway iPhone to query Gmail through my relay.
 RELAY_URL: $origin
-${notificationsEnabled ? 'Relay notifications are enabled. Routing updates automatically; no daily setup is needed.' : 'After pairing, enable Relay notifications in Agent Gateway. No route needs to be copied.'}
+${notificationsEnabled ? 'Relay notifications are enabled. Routing updates automatically; no daily setup is needed.' : 'Notifications turn on by default after confirmed pairing, subject to iOS permission. No route needs to be copied.'}
 
 Runtime setup:
 - Use the Agent Gateway client inside your existing runtime, with Node 22+. If absent, obtain https://github.com/lihyin/agent-gateway, run npm ci and npm run build --workspace agent-adapter. Preserve any existing private GATEWAY_AGENT_STATE; otherwise choose a private, backup-excluded state path. Never share or print that file.
 - If this runtime cannot install/run the client or maintain outbound WebSockets, explain that limitation. Do not invent a connector or claim to be connected.
-- Pairing registers public identities automatically. Enable Relay notifications on the phone once. The relay selects its current push destination using the verified pairing. No extra server or callback URL is needed.
-- Unpairing the phone revokes relay access but does not erase your local pairing state. When I explicitly ask to pair again with a fresh setup prompt, stop the MCP process and use pair --replace. Reconnect Gmail and enable Relay notifications on the phone after re-pairing. Do not treat locally saved pairing state as proof that delivery still works.
+- Pairing registers public identities automatically. Notifications default to enabled after confirmation; grant iOS permission when prompted. The user can turn Notifications off in the app. The relay selects its current push destination using the verified pairing. No extra server or callback URL is needed.
+- Unpairing the phone revokes relay access but does not erase your local pairing state. When I explicitly ask to pair again with a fresh setup prompt, stop the MCP process and use pair --replace. Reconnect Gmail after re-pairing and check iOS notification permission. Do not treat locally saved pairing state as proof that delivery still works.
 
 When I ask about email:
 - Use the paired client, not a direct Gmail connection. Never request Gmail tokens, passwords, private keys or approval overrides.

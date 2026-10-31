@@ -63,6 +63,8 @@ void main() {
           }
           expect(delivery.pairingConfirmed, scenario == 'legacy');
           if (scenario != 'legacy') {
+            await delivery.enableRelayByDefault('https://relay.example.com');
+            expect(delivery.relayEnabled('https://relay.example.com'), isFalse);
             await expectLater(
               delivery.enableRelay('https://relay.example.com', true),
               throwsA(anything),

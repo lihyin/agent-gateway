@@ -119,7 +119,10 @@ Expiry prunes the native inbox; successful domain import is acknowledged before
 removing the notification. Native storage failure grants nothing: Muse retries.
 
 Notification receipt/tap never executes Gmail. Imports happen in the foreground
-after local opt-in for the current epoch/origin and Gmail connection. Policy and
+after notification delivery is enabled for the current epoch/origin and Gmail
+connection. A confirmed pairing enables notifications by default, subject to iOS
+permission. An explicit notification opt-out persists across reloads and restarts;
+unconfirmed pairings cannot enable delivery. Policy and
 access consent precede direct Google requests. Sensitive fields require local
 authentication. Filtering and user disclosure approval precede encrypted release.
 Edit cannot widen scope and is filtered again. Exact-scope Always rules last at

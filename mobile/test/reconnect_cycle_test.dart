@@ -95,8 +95,8 @@ void main() {
     await controller.connect();
     await delivery.pair(f['offer'], f['fingerprint']);
     await controller.reload();
-    await controller.enableRelay(true);
     expect(controller.error, isNull);
+    expect(controller.relayEnabled, isTrue);
     final agent = delivery.agentId!;
     final firstEpoch = delivery.epoch(agent)!;
     expect(registrations, [firstEpoch]);
@@ -126,9 +126,8 @@ void main() {
     expect(controller.pairingComplete, isTrue);
     expect(
       controller.relayEnabled,
-      isFalse,
-    ); // Each new pair needs explicit opt-in.
-    await controller.enableRelay(true);
+      isTrue,
+    ); // Each confirmed new pair enables notifications by default.
     expect(controller.error, isNull);
     expect(controller.connected, isTrue);
     expect(controller.relayEnabled, isTrue);

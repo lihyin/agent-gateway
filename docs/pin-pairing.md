@@ -55,10 +55,11 @@ versions. Older Muse clients reject setup lines more than five minutes from expi
 older relays close pairing sockets after five minutes. Gmail requests and disclosure
 approvals still expire within five minutes; only the code-pairing window changed.
 
-## Enable notification delivery separately
+## Notification delivery
 
 Pairing registers device-signed public transport identities in PairingRegistry.
-Enable **Notifications** on the phone once and grant iOS permission.
+**Notifications** turns on by default after confirmed pairing. Grant iOS permission
+when prompted. Turning the switch off is saved across app reloads and restarts.
 The relay stores the encrypted push destination and selects it using the verified
 pairing. No per-user secret edit, route copying or daily refresh is required.
 The original setup prompt already contains the reusable Gmail skill.

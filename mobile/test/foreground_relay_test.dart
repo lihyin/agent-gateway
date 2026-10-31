@@ -185,6 +185,21 @@ void main() {
     );
   }
 
+  test(
+    'notification defaults respect opt-out across reload and restart',
+    () async {
+      await delivery.enableRelayByDefault(origin);
+      expect(delivery.relayEnabled(origin), isTrue);
+      await delivery.enableRelay(origin, false);
+      await delivery.enableRelayByDefault(origin);
+      expect(delivery.relayEnabled(origin), isFalse);
+      await delivery.initialize();
+      await delivery.enableRelayByDefault(origin);
+      expect(delivery.relayEnabled(origin), isFalse);
+      await delivery.enableRelay(origin, true);
+      expect(delivery.relayEnabled(origin), isTrue);
+    },
+  );
   test('registration uses device proof, survives restart, and is revoked by unpairing', () async {
     await delivery.enableRelay(origin, true);
     final relay = ForegroundRelay(
