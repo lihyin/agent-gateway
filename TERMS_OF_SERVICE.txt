@@ -4,7 +4,7 @@ Effective date: October 31, 2026
 1. Acceptance and scope
 
 These Terms govern your use of the Agent Gateway application and relay services
-provided by the operator of your Agent Gateway deployment (the "Service"). By
+provided by Zerobox (the "Service"). By
 using the Service, you agree to these Terms. If you do not agree, do not use the
 Service. You must have the legal capacity and authority to accept these Terms,
 including on behalf of any organization whose accounts or data you connect.
@@ -111,7 +111,10 @@ agree to updated Terms, stop using the Service.
 
 12. Contact
 
-For questions about these Terms or the project, contact the maintainers through:
+For questions about these Terms or the Service, contact Zerobox:
+hello@zerobox.ai
+
+For public technical issues and project feedback:
 https://github.com/lihyin/agent-gateway/issues
 
 For a separately operated deployment, contact that deployment's operator about

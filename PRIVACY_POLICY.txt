@@ -1,18 +1,15 @@
 AGENT GATEWAY PRIVACY POLICY
 Effective date: October 31, 2026
 
-PUBLICATION NOTE: Replace [OPERATOR LEGAL NAME] and [PRIVACY CONTACT EMAIL]
-with the app operator's verified details before publishing this policy.
-
 1. WHO WE ARE
 
-Agent Gateway is operated by [OPERATOR LEGAL NAME] ("we", "us"). It lets
+Agent Gateway is operated by Zerobox ("we", "us"). It lets
 you review requests from a paired Muse client for selected Gmail information
 and decide what to share. This policy describes the iOS app and its associated
 relay service. It does not replace the privacy policies of Google, Apple,
 Cloudflare, Muse, or another service you choose to use.
 
-Privacy contact: [PRIVACY CONTACT EMAIL]
+Privacy contact: hello@zerobox.ai
 
 2. INFORMATION THE APP HANDLES
 
@@ -129,7 +126,7 @@ Deleting the app should not be relied on as the only way to revoke Google access
 or remove relay records; disconnect and unpair first when possible.
 
 For privacy questions or requests to access, correct, or delete information
-held by the operator, contact [PRIVACY CONTACT EMAIL]. We may need information
+held by the operator, contact hello@zerobox.ai. We may need information
 to verify your request and identify relevant pairing records. Do not send
 passwords, OAuth tokens, private keys, or email content in a support request.
 Some security records may need to be retained to prevent replay or meet

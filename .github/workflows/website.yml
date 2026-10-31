@@ -1,0 +1,32 @@
+name: Deploy product website
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: website-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.3"
+          cache: npm
+      - run: npm ci
+      - name: Check publication details and generate pages
+        run: |
+          if grep -Eq '\[(OPERATOR LEGAL NAME|PRIVACY CONTACT EMAIL)\]' PRIVACY_POLICY.txt; then
+            echo "Set the operator name and privacy contact before publication."
+            exit 1
+          fi
+          node website/build.mjs
+      - name: Deploy static product website
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_SEND_METRICS: "false"
+        run: npx wrangler deploy --config website/wrangler.toml
