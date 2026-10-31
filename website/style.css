@@ -1,10 +1,10 @@
 :root {
   color-scheme: light;
-  --paper: #f6f5f0;
-  --ink: #222b26;
-  --muted: #626961;
-  --line: #d9dcd1;
-  --green: #263b32;
+  --paper: #ffffff;
+  --ink: #0b2940;
+  --muted: #35596d;
+  --line: #d5edfa;
+  --accent: #168ac4;
 }
 * {
   box-sizing: border-box;
@@ -26,10 +26,10 @@ a {
   text-underline-offset: 0.25em;
 }
 a:hover {
-  color: #746040;
+  color: #106b99;
 }
 a:focus-visible {
-  outline: 2px solid #9b6b2f;
+  outline: 2px solid #168ac4;
   outline-offset: 5px;
 }
 header,
@@ -56,15 +56,9 @@ header {
   letter-spacing: -0.5px;
 }
 .mark {
-  display: grid;
-  place-items: center;
-  background: var(--green);
-  color: var(--paper);
   width: 34px;
   height: 34px;
-  border-radius: 9px;
-  font-size: 20px;
-  letter-spacing: -1.5px;
+  object-fit: contain;
 }
 nav,
 footer div {
@@ -109,7 +103,7 @@ h1 em {
   font-family: Georgia, serif;
   font-weight: 400;
   letter-spacing: -0.055em;
-  color: #68745b;
+  color: #168ac4;
 }
 .lead {
   font-size: 20px;
@@ -128,7 +122,7 @@ h1 em {
   align-items: center;
   justify-content: space-between;
   gap: 30px;
-  background: var(--green);
+  background: #1076a8;
   color: white;
   border-radius: 4px;
   padding: 13px 20px;
@@ -136,7 +130,7 @@ h1 em {
   font-size: 14px;
 }
 .button:hover {
-  background: #3d5346;
+  background: #0e6390;
   color: white;
 }
 .text-link {
@@ -173,7 +167,7 @@ ol {
   font:
     13px Georgia,
     serif;
-  color: #747a68;
+  color: #35596d;
   border-bottom: 1px solid var(--line);
   padding-bottom: 16px;
   margin-bottom: 20px;
@@ -248,7 +242,7 @@ footer {
 }
 .legal p {
   font-size: 15px;
-  color: #4d564f;
+  color: #35596d;
   overflow-wrap: anywhere;
 }
 .download {

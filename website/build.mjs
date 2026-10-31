@@ -20,8 +20,8 @@ const links = [
 const repo = "https://github.com/lihyin/agent-gateway";
 function page(title, route, body, description) {
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${escape(description)}"><meta name="theme-color" content="#f6f5f0"><title>${title} — Agent Gateway</title><link rel="stylesheet" href="/style.css"><link rel="icon" href="/icon.svg" type="image/svg+xml"></head>
-<body><a class="skip" href="#main">Skip to content</a><header><a class="brand" href="/" aria-label="Agent Gateway home"><span class="mark" aria-hidden="true">ag</span>Agent Gateway</a><nav aria-label="Main navigation">${links.map(([url, label]) => `<a href="${url}"${route === url ? ' aria-current="page"' : ""}>${label}</a>`).join("")}</nav></header>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${escape(description)}"><meta name="theme-color" content="#ffffff"><title>${title} — Agent Gateway</title><link rel="stylesheet" href="/style.css"><link rel="icon" href="/icon.svg" type="image/svg+xml"></head>
+<body><a class="skip" href="#main">Skip to content</a><header><a class="brand" href="/" aria-label="Agent Gateway home"><img class="mark" src="/icon.svg" alt="" width="34" height="34">Agent Gateway</a><nav aria-label="Main navigation">${links.map(([url, label]) => `<a href="${url}"${route === url ? ' aria-current="page"' : ""}>${label}</a>`).join("")}</nav></header>
 <main id="main">${body}</main><footer><span>Agent Gateway by Zerobox · Your information. Your decision.</span><div>${links
     .slice(1)
     .map(([url, label]) => `<a href="${url}">${label}</a>`)
@@ -91,7 +91,7 @@ await writeFile(
 );
 await writeFile(
   path.join(out, "icon.svg"),
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#263b32"/><text x="32" y="43" text-anchor="middle" font-family="Arial,sans-serif" font-size="36" font-weight="bold" fill="#f6f5f0">ag</text></svg>',
+  await readFile(path.join(root, "mobile/assets/brand/app-icon.svg"), "utf8"),
 );
 await writeFile(
   path.join(out, "_headers"),
