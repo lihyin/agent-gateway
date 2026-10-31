@@ -67,13 +67,20 @@ for (let attempt = 0; attempt < 90; attempt++) {
     if (build.commit?.hash !== process.env.EXPECTED_REVISION)
       throw new Error("Inspection revision mismatch");
     const artifact = build.artifacts?.find(
-      (item) => item.name === "testflight-inspection.json",
+      (item) => item.name.split("/").pop() === "testflight-inspection.json",
     );
     if (
       !artifact?.short_lived_download_url ||
       new URL(artifact.short_lived_download_url).protocol !== "https:"
-    )
+    ) {
+      console.log(
+        JSON.stringify({
+          artifacts: build.artifacts?.map((item) => item.name),
+        }),
+      );
+      if (attempt < 12) continue;
       throw new Error("Sanitized inspection artifact missing");
+    }
     const response = await fetch(artifact.short_lived_download_url, {
       signal: AbortSignal.timeout(30000),
     });
