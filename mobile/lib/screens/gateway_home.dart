@@ -427,12 +427,18 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
               ),
             if (entry.state == ReviewState.access) ...[
               const SizedBox(height: 8),
-              const Text('Preview only. Nothing shared.'),
+              const Text('Preview first, or allow sharing once.'),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 children: [
                   FilledButton(
+                    onPressed: busy
+                        ? null
+                        : () => widget.controller.allowOnce(entry),
+                    child: const Text('Allow'),
+                  ),
+                  TextButton(
                     onPressed: busy
                         ? null
                         : () => widget.controller.access(entry, true),

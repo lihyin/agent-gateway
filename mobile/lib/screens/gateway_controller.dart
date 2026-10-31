@@ -251,6 +251,27 @@ class GatewayController extends ChangeNotifier {
     await _reload();
     await _sync();
   });
+  Future<void> allowOnce(ReviewEntry entry) => _run(() async {
+    try {
+      final fetched = await review.approveAccess(
+        entry.request.id,
+        entry.revision,
+      );
+      if (fetched.state == ReviewState.disclosure) {
+        await review.decide(
+          fetched.request.id,
+          fetched.revision,
+          fetched.candidateDigest,
+          ReviewAction.allow,
+        );
+      }
+    } finally {
+      // Authentication cancellation or a failed fetch can advance review state.
+      // Refresh even on failure so the UI does not retain a stale access entry.
+      await _reload();
+    }
+    await _sync();
+  });
   Future<void> decide(
     ReviewEntry entry,
     ReviewAction action, {

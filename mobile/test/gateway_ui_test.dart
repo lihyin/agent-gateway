@@ -397,6 +397,23 @@ void main() {
       expect(source.fetches, 1);
       expect(find.text('Another request'), findsNothing);
       expect(controller.pendingEntries, isEmpty);
+      await review.begin(request('remote-three', 'Allow without preview'));
+      await controller.reload();
+      await tester.pumpAndSettle();
+      expect(find.text('Preview'), findsOneWidget);
+      expect(find.text('Allow'), findsOneWidget);
+      await tester.ensureVisible(find.text('Allow'));
+      await tester.tap(find.text('Allow'));
+      await tester.pumpAndSettle();
+      expect(source.fetches, 2);
+      expect(
+        (await review.entries())
+            .singleWhere((entry) => entry.request.id == 'remote-three')
+            .state,
+        ReviewState.allowed,
+      );
+      expect(controller.pendingEntries, isEmpty);
+      expect(find.textContaining('Invoice for [redacted]'), findsNothing);
       await tester.ensureVisible(find.text('Disconnect'));
       await tester.tap(find.text('Disconnect'));
       await tester.pumpAndSettle();
