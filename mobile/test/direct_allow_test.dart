@@ -84,10 +84,7 @@ void main() {
           isEmpty,
         );
         if (scenario == 'disclosure_denied') {
-          expect(
-            controller.entries.single.state,
-            ReviewState.disclosure,
-          );
+          expect(controller.entries.single.state, ReviewState.disclosure);
           expect(
             controller.entries.single.revision,
             greaterThan(entry.revision),
