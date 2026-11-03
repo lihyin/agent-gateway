@@ -30,8 +30,9 @@ class MemoryVault implements Vault {
 }
 
 class FakeOAuth implements GmailOAuthProvider {
-  FakeOAuth(this.now);
+  FakeOAuth(this.now, {this.scopes = const [gmailReadScope]});
   final DateTime Function() now;
+  final List<String> scopes;
   int refreshCount = 0, revokeCount = 0;
   bool failRefresh = false, failRevoke = false;
   Future<void> Function()? beforeRefresh, beforeAuthorize;
@@ -39,7 +40,7 @@ class FakeOAuth implements GmailOAuthProvider {
     accessToken: 'test-access-token',
     refreshToken: 'test-refresh-token',
     expiresAt: now().add(const Duration(hours: 1)),
-    scopes: [gmailReadScope],
+    scopes: scopes,
   );
   @override
   Future<GmailTokens> authorize() async {

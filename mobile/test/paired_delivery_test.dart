@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:agentgateway/approvals/review_service.dart';
+import 'package:agentgateway/domain/gmail_request.dart';
 import 'package:agentgateway/transport/crypto.dart';
 import 'package:agentgateway/transport/paired_delivery.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -78,6 +79,60 @@ void main() {
     );
   }
 
+  test('Muse send request is authenticated, exact, replay protected and returns only a send receipt', () async {
+    await pair();
+    final payload = {
+      'source': 'gmail',
+      'operation': 'send',
+      'purpose': 'Send reply',
+      'from': 'owner@example.com',
+      'to': ['to@example.com'],
+      'cc': <String>[],
+      'bcc': <String>[],
+      'subject': 'Hello',
+      'body': 'Composed by Muse',
+    };
+    final envelope = request(payload: payload);
+    await delivery.importRequest(jsonEncode(envelope), review);
+    final entry = (await review.entries()).single;
+    expect(entry.request, isA<GmailSendRequest>());
+    expect((entry.request as GmailSendRequest).body, 'Composed by Muse');
+    final sent = await review.sendEmail(entry.request.id, entry.revision, (
+      message,
+      valid,
+    ) async {
+      expect(valid(), isTrue);
+      expect(message.to, ['to@example.com']);
+      return 'gmail-message-id';
+    });
+    final result = jsonDecode(
+      await delivery.exportResult(sent, review),
+    ) as Map<String, dynamic>;
+    final context = Map<String, dynamic>.from(result['context']);
+    final receipt = await decryptEnvelope(
+      agent,
+      publicIdentity(device),
+      result,
+      context,
+      now,
+    );
+    expect(receipt, {
+      'status': 'allowed',
+      'messages': [
+        {'id': 'gmail-message-id'},
+      ],
+    });
+    await delivery.importRequest(jsonEncode(envelope), review);
+    expect((await review.entries()).single.state, ReviewState.allowed);
+    await expectLater(
+      review.sendEmail(
+        entry.request.id,
+        entry.revision,
+        (_, _) async => 'duplicate',
+      ),
+      throwsA(anything),
+    );
+  });
   Future<ReviewEntry> approve(Map<String, dynamic> envelope) async {
     await delivery.importRequest(jsonEncode(envelope), review);
     final e = (await review.entries()).last;

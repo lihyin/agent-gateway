@@ -93,10 +93,12 @@ test("MCP client lists tools, creates idempotent pending review, and receives on
   await client.connect(b);
   try {
     const list = await client.listTools();
+    assert.ok(list.tools.some((tool) => tool.name === "gmail_request_send"));
     assert.deepEqual(list.tools.map((t) => t.name).sort(), [
       "gateway_request_status",
       "gateway_submit_encrypted_result",
       "gmail_request_preview",
+      "gmail_request_send",
     ]);
     assert.ok(!list.tools.some((t) => /pair|approve|token/.test(t.name)));
     const args = {
@@ -193,6 +195,24 @@ test("MCP client lists tools, creates idempotent pending review, and receives on
       arguments: { requestId: job.requestId },
     });
     assert.deepEqual(status.structuredContent, received.structuredContent);
+    const send = await client.callTool({
+      name: "gmail_request_send",
+      arguments: {
+        requestId: randomUUID(),
+        purpose: "Send reply",
+        from: "owner@example.com",
+        to: ["to@example.com"],
+        cc: [],
+        bcc: [],
+        subject: "Hello",
+        body: "Composed by Muse",
+      },
+    });
+    assert.equal(send.isError, undefined);
+    assert.equal(
+      (send.structuredContent as { status: string }).status,
+      "pending_device_review",
+    );
     now = 400;
     assert.deepEqual(
       (
@@ -245,7 +265,7 @@ test("actual stdio process initializes, lists tools, and fails closed without pa
   const client = new Client({ name: "stdio-test", version: "1.0.0" });
   try {
     await client.connect(transport);
-    assert.equal((await client.listTools()).tools.length, 3);
+    assert.equal((await client.listTools()).tools.length, 4);
     const response = await client.callTool({
       name: "gmail_request_preview",
       arguments: {

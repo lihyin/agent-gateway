@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../approvals/review_service.dart';
 import '../domain/gateway_error.dart';
+import '../domain/gmail_request.dart';
 import 'paired_delivery.dart';
 import 'push_notifications.dart';
 
@@ -257,7 +258,9 @@ class ForegroundRelay {
     for (final entry in entries) {
       if (_handedOff.contains(entry.request.id) ||
           !entry.request.expiresAt.isAfter(clock()) ||
-          ![ReviewState.allowed, ReviewState.denied].contains(entry.state)) {
+          ![ReviewState.allowed, ReviewState.denied].contains(entry.state) &&
+              !(entry.request is GmailSendRequest &&
+                  entry.state == ReviewState.failed)) {
         continue;
       }
       final envelope = Map<String, dynamic>.from(

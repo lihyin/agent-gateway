@@ -53,6 +53,7 @@ export function validateProtocol(
   }
   if (
     name === "request" &&
+    record.operation !== "send" &&
     (record.since as number) >= (record.until as number)
   )
     throw new Error("invalid_request");

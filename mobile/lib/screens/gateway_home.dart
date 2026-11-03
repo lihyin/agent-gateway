@@ -4,10 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../approvals/review_service.dart';
+import '../connectors/gmail_auth.dart';
 import '../domain/gateway_configuration.dart';
+import '../domain/gmail_request.dart';
 import '../domain/muse_skill.dart';
 import '../transport/push_notifications.dart';
 import 'gateway_controller.dart';
+import 'legal_information.dart';
 
 class GatewayHome extends StatefulWidget {
   const GatewayHome({
@@ -30,6 +33,31 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
   String? _selectedRequestId;
   Completer<bool>? _pairingDecision;
   String? _pairingPromptSession;
+  Future<void> _connectGmail({bool reconnect = false}) async {
+    if (!await showGmailPrivacyNotice(context) || !mounted) return;
+    final controller = widget.controller;
+    if (controller.ready &&
+        !controller.busy &&
+        (!controller.connected || reconnect)) {
+      await controller.connect(preserveSendRequests: reconnect);
+    }
+  }
+
+  Future<void> _allowSend(ReviewEntry entry) async {
+    final controller = widget.controller;
+    if (!await controller.session.hasScope(gmailSendScope)) {
+      if (!mounted) return;
+      await _connectGmail(reconnect: true);
+      if (!await controller.session.hasScope(gmailSendScope)) return;
+    }
+    if (!mounted || !controller.connected || controller.gmailSender == null) {
+      return;
+    }
+    await controller.sendEmail(entry, () async {
+      await _resumed?.future.timeout(const Duration(seconds: 30));
+    });
+  }
+
   Future<void> _copyMuseMessage(String message) async {
     try {
       await Clipboard.setData(ClipboardData(text: message));
@@ -406,6 +434,61 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
     if (!entry.request.expiresAt.isAfter(DateTime.now())) {
       return const SizedBox.shrink();
     }
+    if (entry.request case final GmailSendRequest request) {
+      return Card(
+        key: _requestKeys.putIfAbsent(request.id, () => GlobalKey()),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Review email from Muse',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
+              SelectableText('From: ${request.from}'),
+              SelectableText('To: ${request.to.join(', ')}'),
+              if (request.cc.isNotEmpty)
+                SelectableText('Cc: ${request.cc.join(', ')}'),
+              if (request.bcc.isNotEmpty)
+                SelectableText('Bcc: ${request.bcc.join(', ')}'),
+              const SizedBox(height: 12),
+              SelectableText('Subject: ${request.subject}'),
+              const SizedBox(height: 12),
+              SelectableText(request.body),
+              const SizedBox(height: 12),
+              SelectableText('Purpose: ${request.purpose}'),
+              const Text(
+                'Allow sends this exact email through Gmail after device authentication. Sent email cannot be recalled here.',
+              ),
+              if (entry.state == ReviewState.fetching)
+                const LinearProgressIndicator(),
+              if (entry.state == ReviewState.failed)
+                const Text(
+                  'Sending was interrupted or unsuccessful. Check Gmail Sent before asking Muse for another request. This request will not be retried.',
+                ),
+              if (entry.state == ReviewState.access)
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    FilledButton(
+                      onPressed: busy ? null : () => _allowSend(entry),
+                      child: const Text('Allow'),
+                    ),
+                    TextButton(
+                      onPressed: busy
+                          ? null
+                          : () => widget.controller.access(entry, false),
+                      child: const Text('Decline'),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      );
+    }
     final dates = MaterialLocalizations.of(context);
     return Card(
       key: _requestKeys.putIfAbsent(entry.request.id, () => GlobalKey()),
@@ -581,6 +664,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                     child: ListView(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                       children: [
+                        const GmailPrivacyCard(),
                         Card(
                           child: ListTile(
                             leading: const Icon(Icons.mail_outline_rounded),
@@ -594,7 +678,7 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
                                   ? null
                                   : c.connected
                                   ? c.disconnect
-                                  : c.connect,
+                                  : _connectGmail,
                               child: Text(
                                 c.connected ? 'Disconnect' : 'Connect Gmail',
                               ),
@@ -706,6 +790,14 @@ class _GatewayHomeState extends State<GatewayHome> with WidgetsBindingObserver {
     },
   );
   String _errorMessage(String code) => switch (code) {
+    'gmail_send_permission_required' => 'Reconnect Gmail and grant permission to send, then review the request again.',
+    'gmail_sender_mismatch' => 'The requested From address does not match the connected Gmail account. Nothing was sent.',
+    'gmail_send_unknown' => 'Gmail may have sent the email. Check Sent before asking Muse to create another request.',
+    'gmail_send_rejected' =>
+      'Gmail rejected the send request. Nothing will be retried automatically.',
+    'gmail_profile_failed' =>
+      'Could not verify the Gmail sender account. Nothing was sent.',
+    'gmail_send_cancelled' => 'Sending was cancelled before submission.',
     'gmail_cancelled' => 'Gmail connection was cancelled.',
     'gmail_configuration_required' =>
       'Gmail sign-in is not configured for this device.',

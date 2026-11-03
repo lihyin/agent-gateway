@@ -73,6 +73,8 @@ void main() {
     await tester.pump(const Duration(seconds: 15));
     expect(review.reads, reads + 1);
     await tester.tap(find.text('Connect Gmail'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue to Google'));
     await tester.pump();
     expect(controller.connected, isFalse);
     review.hold!.complete();

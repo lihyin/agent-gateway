@@ -21,6 +21,17 @@ const f = JSON.parse(
   ),
 );
 const now = 100;
+const sendPayload = {
+  source: "gmail",
+  operation: "send",
+  purpose: "Send reply",
+  from: "owner@example.com",
+  to: ["to@example.com"],
+  cc: [],
+  bcc: [],
+  subject: "Hello",
+  body: "Composed by Muse",
+};
 function setup(paired = true) {
   const state: BridgeState = {
     identity: f.agent,
@@ -66,6 +77,57 @@ test("encrypted request uses pinned recipient and validated payload", async () =
   ])
     await assert.rejects(bridge.request(p));
   await assert.rejects(setup(false).request(f.payload));
+});
+
+test("Muse send requests preserve exact content, reject changes and accept only a send receipt", async () => {
+  const bridge = setup();
+  const job = await bridge.request(sendPayload);
+  assert.deepEqual(
+    await decrypt(
+      f.device,
+      publicIdentity(f.agent),
+      job.envelope,
+      job.envelope.context,
+      now,
+    ),
+    sendPayload,
+  );
+  assert.equal(
+    (await bridge.request(sendPayload, job.requestId)).requestId,
+    job.requestId,
+  );
+  await assert.rejects(
+    bridge.request({ ...sendPayload, body: "Changed" }, job.requestId),
+    /replay/,
+  );
+  for (const payload of [
+    { ...sendPayload, query: "inbox" },
+    { ...sendPayload, subject: "Injected\r\nBcc: evil@example.com" },
+    { ...sendPayload, to: [] },
+    { ...sendPayload, body: "x".repeat(1200) },
+    { ...sendPayload, to: Array(21).fill("to@example.com") },
+  ])
+    await assert.rejects(bridge.request(payload));
+  const context: Context = {
+    ...job.envelope.context,
+    direction: "result",
+    sender: job.envelope.context.recipient,
+    recipient: job.envelope.context.sender,
+  };
+  const invalid = await encrypt(f.device, publicIdentity(f.agent), context, {
+    status: "allowed",
+    messages: [{ subject: "leaked content" }],
+  });
+  await assert.rejects(bridge.submit(invalid), /invalid_result/);
+  const receipt = { status: "allowed", messages: [{ id: "gmail-id" }] };
+  const result = await encrypt(
+    f.device,
+    publicIdentity(f.agent),
+    context,
+    receipt,
+  );
+  assert.deepEqual(await bridge.submit(result), receipt);
+  assert.deepEqual(await bridge.status(job.requestId), receipt);
 });
 
 test("explicit re-pairing retains the old pair until authenticated acceptance and clears old jobs", async () => {

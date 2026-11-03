@@ -1,5 +1,9 @@
 AGENT GATEWAY PRIVACY POLICY
-Effective date: October 31, 2026
+Effective date: November 2, 2026
+
+App homepage: https://gateway.zerobox.ai/
+Privacy Policy: https://gateway.zerobox.ai/privacy/
+Terms of Use: https://gateway.zerobox.ai/terms/
 
 1. WHO WE ARE
 
@@ -11,6 +15,9 @@ Cloudflare, Muse, or another service you choose to use.
 
 Privacy contact: hello@zerobox.ai
 
+This policy is available without signing in, on a dedicated web page linked
+from our homepage, from the app's home screen, and before Google sign-in.
+
 2. INFORMATION THE APP HANDLES
 
 Gmail access. If you connect Gmail, Google handles your sign-in and consent.
@@ -19,12 +26,40 @@ authorized Gmail API requests directly from your device. The app does not
 receive or store your Google password. Gmail tokens stay in device-local
 secure storage and are not sent to the relay or your paired agent.
 
+The Google permissions requested are gmail.readonly and gmail.send:
+https://www.googleapis.com/auth/gmail.readonly
+https://www.googleapis.com/auth/gmail.send
+gmail.readonly is a broad read-only Gmail permission. Although it can allow
+reading mail, Agent Gateway limits its implemented access to the bounded
+searches and selected fields described here. The Gmail API requires this
+permission for the search queries used by the app; the narrower gmail.metadata
+permission does not support those queries. The send permission allows sending
+messages composed by Muse that you review and approve. The app does not request the broader
+gmail.compose, gmail.modify, or full-mailbox permission, and does not manage
+Gmail drafts or change or delete existing messages. We read your Gmail account's
+email address through the Gmail profile endpoint to show the From address and
+send from the connected account. This does not require Google account profile,
+contacts, calendar, or Drive scopes. Existing read-only grants can keep reading;
+allowing a Muse send request requires reconnecting to grant send permission.
+
 Email information. Following source-access approval, the app can retrieve
 bounded search results with selected fields such as message identifiers,
 dates, senders, subjects, and short snippets. The current app does not retrieve
-attachments or full message bodies and does not send, delete, or modify mail.
+attachments or full message bodies from search results, and does not delete
+or modify existing mail.
 Search terms, request purposes, date ranges, and requested fields are processed
 to prepare the review and enforce its scope.
+
+Outgoing email. Your paired Muse client composes the From, To, Cc, and Bcc
+addresses, subject, and plain-text message and submits an encrypted request
+through the Cloudflare relay. Gateway displays the complete email for review.
+Allow and device authentication are required before submitting it from iPhone to the
+Gmail API. Gmail delivers it to the addressed recipients, including recipients
+outside Google, and normally keeps a copy in Sent. These outgoing compositions
+are known to Muse, which created them; the relay carries encrypted requests.
+Muse receives the send status and Gmail message ID, not Gmail credentials.
+The current send feature does not support attachments or server-side
+Gmail draft management.
 
 Pairing and security information. The app creates device keys and pairing
 identifiers. The relay stores public device and agent pairing records,
@@ -47,19 +82,40 @@ Network information. Connections to Google, Apple, and the relay necessarily
 expose network information such as IP addresses and connection timing to the
 services handling those connections. Infrastructure providers may process
 operational and security information under their own policies and settings.
+The public website is also served through Cloudflare, which can process
+connection and website performance information. This is separate from Gmail
+information and does not give Cloudflare access to Gmail credentials or
+decrypted email results.
 
 3. HOW INFORMATION IS USED AND SHARED
 
 We use information to connect Gmail, pair your selected agent, deliver requests,
-prepare previews, apply your decisions, return approved results, and protect
-the service against unauthorized use.
+prepare previews, apply your decisions, return approved results, review and
+send emails you approve, and protect the service against unauthorized use.
 
-You authorize source access before the app fetches email information. You can
-then review the proposed disclosure, remove fields or shorten text, share once,
-or deny the request. Where offered, a saved approval applies only to its exact
-scope and has a limited lifetime. Additional device authentication may be
-required for sensitive fields. Automatic filtering is best effort and may miss
-sensitive information; inspect the preview before sharing.
+Connecting Gmail grants Google API permission; it does not by itself approve
+a request from an agent. For a new request, Preview authorizes retrieval under
+the request's limits and displays a filtered result for a separate Allow or
+Deny decision. Allow on the initial request authorizes both retrieval and
+one-time sharing of the filtered result without first displaying a preview.
+Deny on the initial request rejects it without retrieving email. The current
+interface does not offer editing of previews. Where a previously saved approval
+rule applies, it is limited to its exact scope and expires within 24 hours;
+source access still requires authorization. Additional device authentication
+may be required for sensitive fields. Filtering is best effort and may miss
+sensitive information. Choose Preview if you want to inspect data before sharing.
+
+Allow on an agent data request never authorizes sending an email. Outgoing
+email has a separate review, Allow/Decline, and device-authentication sequence
+bound to the reviewed sender, recipients, subject, and message. Saved data
+approval rules do not authorize sending. We do not send composed emails
+automatically or in the background. If a send response is lost or uncertain,
+the app asks you to check Sent rather than automatically retrying the message.
+
+Notifications are enabled locally by default after confirmed pairing; iOS
+notification permission still determines whether alerts are delivered. Pairing,
+notification delivery, or tapping a notification does not on its own authorize
+Gmail retrieval or disclosure.
 
 Requests and results are encrypted between the paired endpoints. The relay
 forwards encrypted content and does not have the endpoint private keys needed
@@ -72,7 +128,10 @@ recipient you paired. Review that service's privacy practices, account settings,
 and retention policies before sharing. Agent Gateway cannot recall information
 already delivered to another service.
 
-Google provides Gmail authentication and email APIs. Apple provides iOS
+Google provides Gmail authentication, email search, account sender information,
+and email sending. Your addressed recipients receive the outgoing message and
+may retain or forward it under their own practices. The app cannot recall sent
+email or control copies in recipient mailboxes. Apple provides iOS
 security services and push notifications. Cloudflare hosts the relay and its
 pairing registry. These providers process the information necessary for those
 functions and may process it in countries other than your own.
@@ -80,19 +139,40 @@ functions and may process it in countries other than your own.
 The app has no advertising SDK or third-party product-analytics SDK in its
 current implementation. We do not sell Gmail information, use it for advertising,
 or use it to train generalized artificial-intelligence or machine-learning
-models. Agent Gateway's use and transfer of information received from Google
+models. Google Workspace API data, including derived data, is not used to
+develop, improve, or train non-personalized AI or machine-learning models.
+It is not used for credit decisions or lending, or provided to data brokers,
+information resellers, or advertising platforms for those purposes.
+Agent Gateway's use and transfer of information received from Google
 APIs will adhere to the Google API Services User Data Policy and the Google
 Workspace API User Data and Developer Policy, including their Limited Use
 requirements. User-directed sharing supports the requested user-facing feature;
 it does not authorize advertising, resale, or generalized model training.
+These restrictions also apply to transfers to a paired AI service. Only pair
+a recipient configured to handle the shared data for your requested task under
+these restrictions. We do not grant a recipient permission to use Google data
+for unrelated purposes. Agent Gateway has no feature that uploads decrypted
+Gmail content to our staff for human review.
 
 4. STORAGE AND RETENTION
 
 On iOS, credentials, private keys, and review state use device-local Keychain
 storage configured to be accessible when the device is unlocked and without
 iCloud synchronization. The encrypted notification inbox uses a backup-excluded
-file with iOS file protection. Previews are obscured when the app becomes
-inactive. No storage or transmission method guarantees absolute security.
+file with iOS file protection. Previews and the email review screens are
+obscured when the app becomes inactive. No storage or transmission method
+guarantees absolute security.
+
+Muse-composed send requests, including recipients and message text, are retained
+in device secure review storage for review and replay prevention. They follow
+the bounded request retention below; closing the review does not delete them.
+Encrypted notification requests may remain in the protected inbox until handled.
+Decline does not submit mail. Muse independently holds its composed content
+under its own retention policy. The app does not save Gmail drafts.
+Successful sending creates copies held by Google and the recipients under
+their retention settings, outside the app's local cleanup rules. Normal email
+delivery does not have the paired-agent channel's endpoint encryption; Gmail
+and recipient mail systems process the message for delivery.
 
 Requests expire after a bounded period, generally no more than five minutes.
 Saved approval rules last at most 24 hours. Local request and replay records
@@ -112,12 +192,14 @@ retention practices.
 
 5. YOUR CHOICES AND DELETION
 
-You can deny requests, edit proposed disclosures, reset saved approvals,
+You can preview or deny data requests, choose one-time sharing, decline a send request,
+reset saved approvals,
 disconnect Gmail, unpair Muse, or turn off notifications in the app or iOS
 settings. Disconnecting Gmail removes locally stored Gmail credentials and
 clears the app's source-review state. The app attempts to revoke Google access;
 if that request cannot complete, revoke the grant in your Google Account's
-third-party access settings as well.
+third-party access settings as well:
+https://myaccount.google.com/connections
 
 Unpairing removes the local pairing and attempts to revoke the relay pairing
 and notification route. A network failure can delay remote cleanup. Previously
@@ -133,6 +215,14 @@ Some security records may need to be retained to prevent replay or meet
 applicable legal obligations. We will explain relevant limitations when
 responding to a request.
 
+For a deletion request, identify Agent Gateway and the pairing or device record
+you want removed if you know it. We can help remove active relay pairing and
+notification destination records after appropriate verification. Local Gmail
+tokens and plaintext previews are not held by the relay; use Disconnect Gmail
+to clear source-review state on the device. Security revocation records have
+the retention limitation described above. Contact Google or the paired
+recipient separately about information they hold independently.
+
 6. CLIPBOARD AND EXTERNAL SERVICES
 
 When you use setup-copy actions, pairing instructions, a temporary code, or
@@ -147,6 +237,11 @@ The app does not automatically paste or send clipboard contents to Muse.
 We will update the effective date when this policy changes. Material changes
 to data access or sharing will be communicated through an appropriate notice
 and, where required, a new consent request before the changed processing.
+The November 2, 2026 update describes direct one-time Allow without a preview,
+default notifications after pairing, and prominent in-app policy links; it
+removes the previous description of preview editing, and adds the locally
+Muse-composed Gmail send review flow and its recipients and retention. Policy
+publication does not grant new Google scopes or authorize a new use of your data.
 
 Google policies:
 https://developers.google.com/terms/api-services-user-data-policy

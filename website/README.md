@@ -16,6 +16,15 @@ Deploy to a separate Cloudflare Worker:
 npx wrangler deploy --config website/wrangler.toml
 ```
 
-The website has no JavaScript, forms, analytics, cookies, or external font requests.
-Cloudflare may process network information when serving the website.
-Set the operator and private privacy contact in the root policy before publication.
+The generated website has no application JavaScript, forms, cookies, or external
+font requests. Cloudflare serves the site and may add network or performance
+measurement under the deployment's settings.
+
+Public legal pages are https://gateway.zerobox.ai/privacy/ and
+https://gateway.zerobox.ai/terms/. Both are dedicated, unauthenticated HTML pages,
+with homepage navigation, footer, and Gmail disclosure links. Their text comes
+from the root policies, including the effective date and Zerobox privacy contact.
+The mobile app exposes these same links on its home screen and before Gmail
+OAuth. Google domain ownership and OAuth Branding URL configuration must be
+verified separately in the Google project; a working page does not prove those
+console settings or completion of OAuth verification.

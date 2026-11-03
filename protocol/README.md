@@ -18,6 +18,17 @@ bytes for requests and 65,536 bytes for results; the final push wrapper must be 
 most 4,096 bytes. Routing capabilities travel in the HTTPS submission, never in
 the push payload. Results are bounded to 10 messages and 50,000 plaintext bytes.
 
+Gmail `send` requests contain purpose, from, to/cc/bcc arrays, subject and plain-text
+body composed by Muse. They share the 1200-byte payload limit and five-minute
+lifetime. Gateway displays the complete message for Allow/Decline and verifies the
+connected sender account. Allow plus device authentication sends directly to Gmail.
+No search approval rule authorizes sending. A successful send result has status
+`allowed` and one message containing only the Gmail `id`; denial has no messages.
+`error` may mean delivery is uncertain. Send reservations are durable before any
+authentication or POST; interrupted requests never retry. Reuse the same request ID
+and content for transport retries. Check Gmail Sent before authorizing a new request
+after error or expiry. Gateway has no email compose editor or Gmail draft feature.
+
 See [cryptographic decision](../docs/crypto-design.md) and the closed JSON schemas
 in `schemas/`. `fixtures/crypto.json` contains public test-only keys and a standard
 nested JWS/JWE sample, never production credentials.

@@ -342,51 +342,90 @@ class PairedDelivery {
             context,
             clock(),
           );
-          exactKeys(payload, {
-            'source',
-            'operation',
-            'query',
-            'purpose',
-            'fields',
-            'since',
-            'until',
-            'maxResults',
-          });
+          final send = payload['operation'] == 'send';
+          exactKeys(
+            payload,
+            send
+                ? {
+                    'source',
+                    'operation',
+                    'purpose',
+                    'from',
+                    'to',
+                    'cc',
+                    'bcc',
+                    'subject',
+                    'body',
+                  }
+                : {
+                    'source',
+                    'operation',
+                    'query',
+                    'purpose',
+                    'fields',
+                    'since',
+                    'until',
+                    'maxResults',
+                  },
+          );
           if (utf8.encode(jsonEncode(payload)).length > 1200 ||
               payload['source'] != 'gmail' ||
-              payload['operation'] != 'search' ||
-              payload['since'] is! int ||
-              payload['until'] is! int ||
-              payload['maxResults'] is! int ||
-              payload['fields'] is! List ||
-              payload['fields'].length != payload['fields'].toSet().length) {
+              (!send &&
+                  (payload['operation'] != 'search' ||
+                      payload['since'] is! int ||
+                      payload['until'] is! int ||
+                      payload['maxResults'] is! int ||
+                      payload['fields'] is! List ||
+                      payload['fields'].length !=
+                          payload['fields'].toSet().length))) {
             throw const GatewayError('invalid_envelope');
           }
-          final request = GmailRequest(
-            id: context['requestId'],
-            agentId: context['sender'],
-            pairingEpoch: context['pairingEpoch'],
-            query: payload['query'],
-            purpose: payload['purpose'],
-            fields: Set<String>.from(payload['fields']),
-            since: DateTime.fromMillisecondsSinceEpoch(
-              payload['since'] * 1000,
-              isUtc: true,
-            ),
-            until: DateTime.fromMillisecondsSinceEpoch(
-              payload['until'] * 1000,
-              isUtc: true,
-            ),
-            maxResults: payload['maxResults'],
-            issuedAt: DateTime.fromMillisecondsSinceEpoch(
-              context['issuedAt'] * 1000,
-              isUtc: true,
-            ),
-            expiresAt: DateTime.fromMillisecondsSinceEpoch(
-              context['expiresAt'] * 1000,
-              isUtc: true,
-            ),
-          );
+          final request = send
+              ? GmailSendRequest(
+                  id: context['requestId'],
+                  agentId: context['sender'],
+                  pairingEpoch: context['pairingEpoch'],
+                  purpose: payload['purpose'],
+                  from: payload['from'],
+                  to: List<String>.from(payload['to']),
+                  cc: List<String>.from(payload['cc']),
+                  bcc: List<String>.from(payload['bcc']),
+                  subject: payload['subject'],
+                  body: payload['body'],
+                  issuedAt: DateTime.fromMillisecondsSinceEpoch(
+                    context['issuedAt'] * 1000,
+                    isUtc: true,
+                  ),
+                  expiresAt: DateTime.fromMillisecondsSinceEpoch(
+                    context['expiresAt'] * 1000,
+                    isUtc: true,
+                  ),
+                )
+              : GmailRequest(
+                  id: context['requestId'],
+                  agentId: context['sender'],
+                  pairingEpoch: context['pairingEpoch'],
+                  query: payload['query'],
+                  purpose: payload['purpose'],
+                  fields: Set<String>.from(payload['fields']),
+                  since: DateTime.fromMillisecondsSinceEpoch(
+                    payload['since'] * 1000,
+                    isUtc: true,
+                  ),
+                  until: DateTime.fromMillisecondsSinceEpoch(
+                    payload['until'] * 1000,
+                    isUtc: true,
+                  ),
+                  maxResults: payload['maxResults'],
+                  issuedAt: DateTime.fromMillisecondsSinceEpoch(
+                    context['issuedAt'] * 1000,
+                    isUtc: true,
+                  ),
+                  expiresAt: DateTime.fromMillisecondsSinceEpoch(
+                    context['expiresAt'] * 1000,
+                    isUtc: true,
+                  ),
+                );
           request.validate(clock());
           final id = request.id;
           final existing = _replay[id];
@@ -438,7 +477,11 @@ class PairedDelivery {
           'recipient': requestContext['sender'],
         };
         final payload = {
-          'status': entry.state == ReviewState.allowed ? 'allowed' : 'denied',
+          'status': entry.state == ReviewState.allowed
+              ? 'allowed'
+              : entry.state == ReviewState.failed
+              ? 'error'
+              : 'denied',
           'messages': entry.state == ReviewState.allowed ? entry.candidate : [],
         };
         if (utf8.encode(jsonEncode(payload)).length > 50000) {

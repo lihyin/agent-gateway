@@ -16,16 +16,25 @@ process alive during review; do not run the operator CLI concurrently on its
 locked state file. Only JSON-RPC goes to stdout, sanitized diagnostics to stderr.
 Source credentials and phone private keys are never accepted.
 
-| Tool                     | Behavior                                                                                                                                                                                                    |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `gmail_request_preview`  | Accepts a UUID `requestId`, query, purpose, fields, Unix-second since/until and maxResults. Durably creates a bounded encrypted job, starts an outbound relay connection and returns a pending ID promptly. |
-| `gateway_request_status` | Reads agent-owned state. Returns pending, original expiry or a verified approved/denied outcome. Pending does not mean device receipt or approval.                                                          |
+| Tool                     | Behavior                                                                                                                                                                                                               |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gmail_request_preview`  | Accepts a UUID `requestId`, query, purpose, fields, Unix-second since/until and maxResults. Durably creates a bounded encrypted job, starts an outbound relay connection and returns a pending ID promptly.            |
+| `gmail_request_send`     | Accepts a UUID requestId, purpose, from, to/cc/bcc arrays, subject, and plain-text body composed by Muse. Gateway shows the complete email with Allow/Decline and authenticates before sending directly through Gmail. |
+| `gateway_request_status` | Reads agent-owned state. Returns pending, original expiry or a verified approved/denied outcome. Pending does not mean device receipt or approval.                                                                     |
 
 At most ten messages and thirty days are supported, with id/date/subject/from/snippet
 fields and 200-character query/purpose limits. The phone independently checks
 scope and consent, filters data, and requires local confirmation for sensitive
 fields. Original requests expire after five minutes, including review time.
 Status polling is local to the agent process; there is no relay status database.
+
+Send requests must fit 1200 UTF-8 bytes in total and include at most 20 recipients.
+The From address must match the connected Gmail account. No composer, attachments,
+or Gmail drafts are provided in Gateway. Reuse the identical UUID and content for
+transport retries. A durable reservation prevents the same request from sending
+again after restart or uncertainty. Only an allowed send result containing a Gmail
+message ID confirms submission; errors/expiry require checking Gmail Sent before
+asking the user to approve a new request. Never submit replacements automatically.
 
 The user receives a generic APNs alert, opens the iPhone app, authorizes access,
 reviews the filtered preview and approves/denies. A signed encrypted outcome

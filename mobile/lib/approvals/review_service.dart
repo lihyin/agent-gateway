@@ -223,6 +223,9 @@ class ReviewService {
       () async => _pending(id, ReviewState.access, revision),
     );
     final generation = _generation;
+    if (captured.request is GmailSendRequest) {
+      throw const GatewayError('send_review_required');
+    }
     if (captured.request.highRisk &&
         !await confirmation.confirm(
           'Confirm access to Gmail sender or snippet data',
@@ -305,6 +308,9 @@ class ReviewService {
       () async => _pending(id, ReviewState.disclosure, revision),
     );
     final generation = _generation;
+    if (captured.request is GmailSendRequest) {
+      throw const GatewayError('send_review_required');
+    }
     if (captured.candidateDigest != digest) {
       throw const GatewayError('candidate_changed');
     }
@@ -387,6 +393,69 @@ class ReviewService {
         await _save();
         return entry;
       });
+  Future<ReviewEntry> sendEmail(
+    String id,
+    int revision,
+    Future<String> Function(GmailSendRequest, bool Function()) send,
+  ) async {
+    final generation = _generation;
+    final captured = await _serial.run(() async {
+      final entry = _pending(id, ReviewState.access, revision);
+      if (entry.request is! GmailSendRequest) {
+        throw const GatewayError('send_review_required');
+      }
+      // Persist before authentication/network: interrupted sends are never retried.
+      final reserved = ReviewEntry(
+        request: entry.request,
+        state: ReviewState.fetching,
+        revision: revision + 1,
+      );
+      _entries[id] = reserved;
+      _record(reserved, 'send_attempt_reserved');
+      await _save();
+      return reserved;
+    });
+    bool valid() =>
+        _ready &&
+        generation == _generation &&
+        _entries[id]?.state == ReviewState.fetching &&
+        currentEpoch(captured.request.agentId) ==
+            captured.request.pairingEpoch &&
+        captured.request.expiresAt.isAfter(clock());
+    try {
+      final messageId = await send(captured.request as GmailSendRequest, valid);
+      return await _serial.run(() async {
+        if (!valid()) throw const GatewayError('gmail_send_unknown');
+        final entry = ReviewEntry(
+          request: captured.request,
+          state: ReviewState.allowed,
+          candidate: [
+            {'id': messageId},
+          ],
+          revision: revision + 2,
+        );
+        _entries[id] = entry;
+        _record(entry, 'email_sent');
+        await _save();
+        return entry;
+      });
+    } catch (_) {
+      await _serial.run(() async {
+        if (_entries[id]?.state == ReviewState.fetching) {
+          final entry = ReviewEntry(
+            request: captured.request,
+            state: ReviewState.failed,
+            revision: revision + 2,
+          );
+          _entries[id] = entry;
+          _record(entry, 'send_failed_or_unknown');
+          await _save();
+        }
+      });
+      rethrow;
+    }
+  }
+
   Future<void> revokeRule(String scope) => _serial.run(() async {
     _rules.removeWhere((r) => r['scope'] == scope);
     await _save();
@@ -395,7 +464,9 @@ class ReviewService {
       _serial.run(() async {
         final e = _entries[id];
         if (e == null ||
-            ![ReviewState.allowed, ReviewState.denied].contains(e.state) ||
+            ![ReviewState.allowed, ReviewState.denied].contains(e.state) &&
+                !(e.request is GmailSendRequest &&
+                    e.state == ReviewState.failed) ||
             e.revision != revision ||
             e.candidateDigest != digest) {
           throw const GatewayError('stale_review');
@@ -410,6 +481,15 @@ class ReviewService {
       _rules = [];
       _audit = [];
       await vault.delete('review.state');
+    });
+  }
+
+  Future<void> retainSendRequestsForReconnect() {
+    _generation++;
+    return _serial.run(() async {
+      _entries.removeWhere((_, e) => e.request is! GmailSendRequest);
+      _rules = [];
+      await _save();
     });
   }
 }

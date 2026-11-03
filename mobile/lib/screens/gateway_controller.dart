@@ -6,8 +6,10 @@ import '../approvals/local_confirmation.dart';
 import '../approvals/review_service.dart';
 import '../connectors/gmail_auth.dart';
 import '../connectors/gmail_connector.dart';
+import '../connectors/gmail_sender.dart';
 import '../domain/gateway_configuration.dart';
 import '../domain/gateway_error.dart';
+import '../domain/gmail_request.dart';
 import '../domain/muse_skill.dart';
 import '../transport/paired_delivery.dart';
 import '../transport/foreground_relay.dart';
@@ -28,6 +30,7 @@ class GatewayController extends ChangeNotifier {
     required this.gmailConfigured,
     this.delivery,
     this.relay,
+    this.gmailSender,
     this.pairingFactory = PinPairing.new,
   }) {
     relay?.onAction = () {
@@ -52,6 +55,7 @@ class GatewayController extends ChangeNotifier {
       session: session,
       review: review,
       gmailConfigured: oauth.isValid,
+      gmailSender: GmailSender(session, confirmation: DeviceConfirmation()),
       delivery: delivery,
       relay: configuration.relayUrl.isEmpty
           ? null
@@ -59,6 +63,7 @@ class GatewayController extends ChangeNotifier {
     );
   }
   final GmailSession session;
+  final GmailSender? gmailSender;
   final ReviewService review;
   final bool gmailConfigured;
   final PairedDelivery? delivery;
@@ -130,11 +135,13 @@ class GatewayController extends ChangeNotifier {
             delivery?.epoch(entry.request.agentId) ==
                 entry.request.pairingEpoch &&
             entry.request.expiresAt.isAfter(DateTime.now()) &&
-            [
-              ReviewState.access,
-              ReviewState.fetching,
-              ReviewState.disclosure,
-            ].contains(entry.state),
+            ((entry.request is GmailSendRequest &&
+                    entry.state == ReviewState.failed) ||
+                [
+                  ReviewState.access,
+                  ReviewState.fetching,
+                  ReviewState.disclosure,
+                ].contains(entry.state)),
       )
       .toList(growable: false);
   List<Map<String, dynamic>> rules = [];
@@ -199,11 +206,14 @@ class GatewayController extends ChangeNotifier {
   Future<void> _reload() async {
     entries = (await review.entries())
         .where(
-          (entry) => [
-            ReviewState.access,
-            ReviewState.fetching,
-            ReviewState.disclosure,
-          ].contains(entry.state),
+          (entry) =>
+              (entry.request is GmailSendRequest &&
+                  entry.state == ReviewState.failed) ||
+              [
+                ReviewState.access,
+                ReviewState.fetching,
+                ReviewState.disclosure,
+              ].contains(entry.state),
         )
         .toList(growable: false);
     rules = await review.rules();
@@ -233,8 +243,12 @@ class GatewayController extends ChangeNotifier {
     if (enabled) await relay!.register(delivery!);
     await _sync();
   });
-  Future<void> connect() => _run(() async {
-    await review.cancelAll();
+  Future<void> connect({bool preserveSendRequests = false}) => _run(() async {
+    if (preserveSendRequests) {
+      await review.retainSendRequestsForReconnect();
+    } else {
+      await review.cancelAll();
+    }
     await session.connect();
     connected = true;
     await _reload();
@@ -256,6 +270,33 @@ class GatewayController extends ChangeNotifier {
     }
     await _reload();
     await _sync();
+  });
+  Future<void> sendEmail(
+    ReviewEntry entry,
+    Future<void> Function() waitUntilResumed,
+  ) => _run(() async {
+    try {
+      if (gmailSender == null) {
+        throw const GatewayError('gmail_send_unavailable');
+      }
+      await review.sendEmail(entry.request.id, entry.revision, (
+        request,
+        valid,
+      ) async {
+        final account = await gmailSender!.loadAccount();
+        if (account.address.toLowerCase() != request.from.toLowerCase()) {
+          throw const GatewayError('gmail_sender_mismatch');
+        }
+        return gmailSender!.send(
+          request.message(account),
+          stillAuthorized: () => !_disposed && foreground && valid(),
+          waitUntilResumed: waitUntilResumed,
+        );
+      });
+    } finally {
+      await _reload();
+      await _sync();
+    }
   });
   Future<void> allowOnce(ReviewEntry entry) => _run(() async {
     try {
@@ -321,5 +362,6 @@ class GatewayController extends ChangeNotifier {
     pinPairing?.close();
     super.dispose();
     relay?.close();
+    gmailSender?.close();
   }
 }

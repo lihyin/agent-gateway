@@ -7,6 +7,8 @@ import '../domain/gateway_error.dart';
 import '../vault/vault.dart';
 
 const gmailReadScope = 'https://www.googleapis.com/auth/gmail.readonly';
+const gmailSendScope = 'https://www.googleapis.com/auth/gmail.send';
+const gmailScopes = [gmailReadScope, gmailSendScope];
 
 class GmailOAuthConfiguration {
   const GmailOAuthConfiguration(this.clientId);
@@ -107,7 +109,7 @@ class NativeGmailOAuth implements GmailOAuthProvider {
           configuration.clientId,
           configuration.redirectUri,
           serviceConfiguration: _endpoints,
-          scopes: [gmailReadScope],
+          scopes: gmailScopes,
           promptValues: ['consent'],
           additionalParameters: {'access_type': 'offline'},
         ),
@@ -131,7 +133,7 @@ class NativeGmailOAuth implements GmailOAuthProvider {
             configuration.redirectUri,
             refreshToken: current.refreshToken,
             serviceConfiguration: _endpoints,
-            scopes: [gmailReadScope],
+            scopes: current.scopes.where(gmailScopes.contains).toList(),
           ),
         ),
         previousRefresh: current.refreshToken,
@@ -178,20 +180,32 @@ class GmailSession {
   int get generation => _generation;
   Future<bool> isConnected() async =>
       !_blocked && await vault.read('gmail.tokens') != null;
-  Future<void> connect() => _serial.run(() async {
-    final generation = _generation;
-    final tokens = await provider.authorize();
-    if (generation != _generation) {
-      await provider.revoke(tokens);
-      throw const GatewayError('gmail_disconnected');
-    }
-    if (!tokens.scopes.contains(gmailReadScope)) {
-      throw const GatewayError('gmail_grant_incomplete');
-    }
-    await vault.write('gmail.tokens', tokens.toJson());
-    _blocked = false;
-  });
-  Future<String> accessToken() => _serial.run(() async {
+  Future<void> connect() {
+    final generation = ++_generation;
+    return _serial.run(() async {
+      final tokens = await provider.authorize();
+      if (generation != _generation) {
+        await provider.revoke(tokens);
+        throw const GatewayError('gmail_disconnected');
+      }
+      if (!tokens.scopes.contains(gmailReadScope)) {
+        throw const GatewayError('gmail_grant_incomplete');
+      }
+      await vault.write('gmail.tokens', tokens.toJson());
+      _blocked = false;
+    });
+  }
+
+  Future<bool> hasScope(String scope) async {
+    if (_blocked) return false;
+    final stored = await vault.read('gmail.tokens');
+    return stored != null &&
+        GmailTokens.fromJson(stored).scopes.contains(scope);
+  }
+
+  Future<String> accessToken({
+    Set<String> requiredScopes = const {gmailReadScope},
+  }) => _serial.run(() async {
     if (_blocked) throw const GatewayError('gmail_disconnected');
     final generation = _generation;
     final stored = await vault.read('gmail.tokens');
@@ -199,6 +213,9 @@ class GmailSession {
     var tokens = GmailTokens.fromJson(stored);
     if (!tokens.scopes.contains(gmailReadScope)) {
       throw const GatewayError('gmail_grant_incomplete');
+    }
+    if (!tokens.scopes.toSet().containsAll(requiredScopes)) {
+      throw const GatewayError('gmail_send_permission_required');
     }
     if (!tokens.expiresAt.isAfter(clock().add(const Duration(seconds: 60)))) {
       try {
@@ -219,6 +236,9 @@ class GmailSession {
     }
     if (generation != _generation || _blocked) {
       throw const GatewayError('gmail_disconnected');
+    }
+    if (!tokens.scopes.toSet().containsAll(requiredScopes)) {
+      throw const GatewayError('gmail_send_permission_required');
     }
     return tokens.accessToken;
   });

@@ -14,8 +14,8 @@ const escape = (value) =>
 const links = [
   ["/", "Overview"],
   ["/contact/", "Contact"],
-  ["/terms/", "Terms"],
-  ["/privacy/", "Privacy"],
+  ["/terms/", "Terms of Use"],
+  ["/privacy/", "Privacy Policy"],
 ];
 const repo = "https://github.com/lihyin/agent-gateway";
 function page(title, route, body, description) {
@@ -27,9 +27,9 @@ function page(title, route, body, description) {
     .map(([url, label]) => `<a href="${url}">${label}</a>`)
     .join("")}<a href="${repo}">GitHub ↗</a></div></footer></body></html>`;
 }
-const overview = `<section class="hero"><p class="eyebrow">A personal gateway for your agent</p><h1>Protect your Gmail<br><em>from Muse.</em></h1><p class="lead">Let Muse request the Gmail information it needs. Review what leaves your phone, and decide what to share.</p><div class="actions"><a class="button" href="#how-it-works">See how it works <span aria-hidden="true">↓</span></a><a class="text-link" href="${repo}">Explore the project ↗</a></div><p class="small">Built for iPhone. Available through configured beta deployments.</p></section>
-<section class="flow" id="how-it-works" aria-labelledby="flow-title"><div class="section-heading"><p class="eyebrow">From request to decision</p><h2 id="flow-title">You stay in the loop.</h2></div><ol><li><span class="number">01</span><h3>Pair your agent</h3><p>Connect Muse using a one-time code. Your phone and agent establish their pairing.</p></li><li><span class="number">02</span><h3>Review the request</h3><p>Open the app, authorize Gmail access, and review a limited, filtered preview.</p></li><li><span class="number">03</span><h3>Choose what to share</h3><p>Allow or deny disclosure. Approved information returns encrypted to your paired agent.</p></li></ol></section>
-<section class="principles"><div><p class="eyebrow">Designed around your control</p><h2>Useful access.<br>Clear boundaries.</h2></div><div class="details"><article><h3>Credentials stay on your phone</h3><p>Gmail credentials and device private keys remain on your device. The relay transports encrypted requests and results.</p></article><article><h3>Read-only Gmail access</h3><p>The current app retrieves selected email metadata and snippets. It does not send, modify, or delete your mail.</p></article><article><h3>A decision before disclosure</h3><p>Review each preview and any saved approval rules. Filtering is best effort, so check sensitive information before sharing.</p></article></div></section>
+const overview = `<section class="hero"><p class="eyebrow">A personal gateway for your agent</p><h1>Protect your Gmail<br><em>from Muse.</em></h1><p class="lead">Let Muse request the Gmail information it needs. Preview a result first, or allow one-time sharing. You decide what leaves your phone.</p><div class="actions"><a class="button" href="#how-it-works">See how it works <span aria-hidden="true">↓</span></a><a class="text-link" href="${repo}">Explore the project ↗</a></div><p class="small">Built for iPhone. Available through configured beta deployments.</p><aside class="legal-note" aria-label="Gmail access and privacy"><strong>Before you connect Gmail</strong><p>Agent Gateway by Zerobox uses Gmail access for bounded searches of selected message details and to send email composed by Muse and approved by you. Gmail tokens stay on your device. Sharing results with Muse and sending email require separate approval. Outgoing email goes directly to Gmail after full review and device authentication.</p><p>Read our <a href="/privacy/">Privacy Policy</a> and <a href="/terms/">Terms of Use</a> for data access, sharing, retention, and deletion details.</p></aside></section>
+<section class="flow" id="how-it-works" aria-labelledby="flow-title"><div class="section-heading"><p class="eyebrow">From request to decision</p><h2 id="flow-title">You stay in the loop.</h2></div><ol><li><span class="number">01</span><h3>Pair your agent</h3><p>Connect Muse using a one-time code. Your phone and agent establish their pairing.</p></li><li><span class="number">02</span><h3>Choose how to respond</h3><p>Preview retrieves a filtered result for review. Allow retrieves and shares once without showing a preview. Deny rejects the request without fetching email.</p></li><li><span class="number">03</span><h3>Stay in control</h3><p>Approved information returns encrypted to your paired agent. Disconnect Gmail, unpair Muse, or reset saved approvals when needed.</p></li></ol></section>
+<section class="principles"><div><p class="eyebrow">Designed around your control</p><h2>Useful access.<br>Clear boundaries.</h2></div><div class="details"><article><h3>Credentials stay on your phone</h3><p>Gmail credentials and device private keys remain on your device. The relay transports encrypted requests and results.</p></article><article><h3>Review before sending</h3><p>Read selected email metadata and snippets, or review plain-text email composed by Muse with To, Cc, and Bcc. Allow or decline the complete message and authenticate before sending through Gmail. The app does not modify or delete existing mail, upload attachments, or save Gmail drafts.</p></article><article><h3>A decision before disclosure</h3><p>Choose Preview if you want to inspect the result before sharing. Filtering is best effort. Google Workspace data is not used to develop, improve, or train non-personalized AI or machine-learning models.</p></article></div></section>
 <section class="closing"><p class="eyebrow">Open project. Human contact.</p><h2>Want to know more?</h2><p>Read the source, ask a question, or learn how your information is handled.</p><a class="text-link" href="/contact/">Get in touch <span aria-hidden="true">↗</span></a></section>`;
 await writeFile(
   path.join(out, "index.html"),
@@ -52,8 +52,8 @@ await writeFile(
   ),
 );
 for (const [file, route, title] of [
-  ["TERMS_OF_SERVICE.txt", "terms", "Terms of service"],
-  ["PRIVACY_POLICY.txt", "privacy", "Privacy policy"],
+  ["TERMS_OF_SERVICE.txt", "terms", "Terms of Use"],
+  ["PRIVACY_POLICY.txt", "privacy", "Privacy Policy"],
 ]) {
   const text = (await readFile(path.join(root, file), "utf8")).trim();
   const paragraphs = text.split(/\r?\n\s*\r?\n/).slice(1);

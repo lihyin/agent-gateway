@@ -54,3 +54,5 @@ Codemagic uses `RELAY_URL`, `RELEASE_SHA`, `ENVIRONMENT` and the public
 health services. The mock/demo callback service is development scaffolding, not a
 production dependency. GitHub Actions deploys tested relay revisions and
 orchestrates signed iOS TestFlight builds. Android distribution remains deferred.
+
+The mobile app also supports reviewing Muse-composed plain-text Gmail messages with To/Cc/Bcc, Allow/Decline, and device authentication before sending. See [Gmail setup](docs/gmail-setup.md) for scopes and release requirements.

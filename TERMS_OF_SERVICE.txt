@@ -1,5 +1,9 @@
-AGENT GATEWAY TERMS OF SERVICE
-Effective date: October 31, 2026
+AGENT GATEWAY TERMS OF USE
+Effective date: November 2, 2026
+
+App homepage: https://gateway.zerobox.ai/
+Terms of Use: https://gateway.zerobox.ai/terms/
+Privacy Policy: https://gateway.zerobox.ai/privacy/
 
 1. Acceptance and scope
 
@@ -15,6 +19,12 @@ Agent Gateway connects your device with a paired agent, such as Meta Muse, to
 request limited Gmail information. The app provides controls for authorizing
 source access, reviewing results, and approving or denying disclosure. A relay
 transports encrypted requests and results and supports notifications.
+Muse can compose plain-text email and submit an encrypted send request through
+the relay. Gateway displays the sender, To/Cc/Bcc recipients, subject, and full
+message for Allow or Decline. Allow and device authentication submit the exact
+reviewed message directly to Gmail. The app does not provide a compose editor,
+create or
+manage drafts in Gmail or support attachments.
 
 Availability and supported features depend on your app version, device,
 deployment configuration, and third-party services. Beta and TestFlight releases
@@ -28,10 +38,28 @@ codes, and paired agents. Review pairing details, requested access, previews, an
 any approval rules before accepting them. Remove pairings and revoke permissions
 when they are no longer needed or you suspect unauthorized access.
 
-Source access consent and disclosure approval serve different purposes. Granting
-access allows retrieval under the app's controls; disclosure approval permits
-sharing the approved result with the paired agent. Saved approval rules may
-permit disclosure within the rule's scope until the rule expires or is revoked.
+Connecting Gmail requests Gmail read-only and send permissions, but does not
+by itself approve agent requests or send any email. Preview retrieves a filtered
+result for you to review
+before a separate Allow or Deny decision. Allow on the initial request
+authorizes retrieval and one-time sharing without displaying a preview first.
+Deny on the initial request rejects it without retrieving email. The current
+interface does not offer preview editing. Previously saved exact-scope approval
+rules may permit disclosure until they expire or are reset, but do not bypass
+source-access authorization or sensitive-field authentication.
+
+Sending has a separate email review and Allow/Decline flow with device authentication.
+Allow on a data request, a pairing approval, or a saved disclosure rule does
+not authorize sending mail. You are responsible for checking the sender account,
+all To, Cc, and Bcc recipients, and the exact subject and body before sending.
+Closing a review does not decline or delete the stored request. The app does not recall sent
+messages. If the result of a send is uncertain, check Gmail Sent before creating
+another copy; the app does not automatically retry the attempted submission.
+Existing read-only connections must grant send permission before using this flow.
+
+Pairing can enable the app's notification setting by default. iOS permission
+still controls notification delivery. Pairing, receiving an alert, or tapping
+an alert does not itself approve a Gmail request.
 
 4. Information and privacy
 
@@ -45,7 +73,12 @@ Filtering and redaction may miss sensitive information. You remain responsible
 for reviewing what you share. Once a recipient receives approved information,
 Agent Gateway cannot guarantee its deletion or control the recipient's storage,
 use, or onward disclosure. Review the recipient's terms and privacy practices.
-These Terms do not replace any applicable privacy notice.
+The Agent Gateway Privacy Policy explains the Google data accessed, its use,
+recipients, protection, retention, deletion, and your choices:
+https://gateway.zerobox.ai/privacy/
+Both documents are linked on the homepage, on the app's home screen, and before
+Google sign-in. Reading a policy does not grant API permission; Google sign-in
+and the app's request controls provide the relevant authorization steps.
 
 5. Acceptable use
 
@@ -54,6 +87,18 @@ access accounts without permission; steal credentials or data; send malicious
 requests or software; bypass consent, approval, authentication, or security
 controls; or disrupt the Service or its providers. Do not misrepresent your
 identity, authority, or the purpose of a request.
+Do not use email sending for spam, phishing, impersonation, harassment, or
+other unlawful or unauthorized communications. Obtain any recipient permissions
+required for your communications and comply with Gmail's applicable policies.
+
+Google Workspace data and derived data may be used only for the authorized
+user-facing task under the Google API Services User Data Policy and Google
+Workspace API User Data and Developer Policy, including Limited Use. Do not
+use or transfer that data for advertising, resale, creditworthiness or lending
+decisions, or to develop, improve, or train non-personalized or generalized AI
+or machine-learning models. Configure a paired agent and any onward recipients
+to honor these restrictions. An Allow decision is not permission for these
+prohibited uses.
 
 6. Third-party services
 
@@ -70,6 +115,8 @@ You retain your rights in your information. You authorize processing and
 transmission of that information as necessary to carry out your requests and
 approvals and operate the Service, subject to applicable privacy commitments.
 These Terms do not transfer ownership of your information.
+The authorization to operate the Service does not override the Privacy Policy
+or permit broader processing of Google user data.
 
 The repository's source code is separately licensed under the Apache License,
 Version 2.0, as provided in LICENSE. These Terms do not limit rights granted by
@@ -108,6 +155,10 @@ Updated Terms will be made available with a revised effective date. Material
 changes will be communicated through the app, repository, or another available
 Service notice before they take effect where required by law. If you do not
 agree to updated Terms, stop using the Service.
+Changes to Google data access, use, or sharing will also be reflected in the
+Privacy Policy and relevant in-app notices. Where required, renewed consent
+will be obtained before changed processing begins. The current policy date is
+displayed on the public legal pages.
 
 12. Contact
 

@@ -211,7 +211,21 @@ export class Bridge {
       if (Object.keys(this.state.jobs).length >= 20)
         throw new Error("capacity");
       validateProtocol("request", payload, now);
-      if (
+      if (!(payload.purpose as string).trim())
+        throw new Error("invalid_request");
+      if (payload.operation === "send") {
+        const recipients = [
+          ...(payload.to as string[]),
+          ...(payload.cc as string[]),
+          ...(payload.bcc as string[]),
+        ];
+        if (
+          recipients.length > 20 ||
+          !(payload.subject as string).trim() ||
+          !(payload.body as string).trim()
+        )
+          throw new Error("invalid_request");
+      } else if (
         payload.operation !== "search" ||
         (payload.until as number) > now ||
         (payload.until as number) - (payload.since as number) > 30 * 86400 ||
@@ -272,18 +286,30 @@ export class Bridge {
     );
     const messages = result.messages as Record<string, unknown>[];
     const scope = job.scope;
-    if (!scope || messages.length > (scope.maxResults as number))
-      throw new Error("invalid_result");
-    for (const message of messages) {
+    if (!scope) throw new Error("invalid_result");
+    if (scope.operation === "send") {
       if (
-        Object.keys(message).some(
-          (k) => !(scope.fields as string[]).includes(k),
-        ) ||
-        (message.date !== undefined &&
-          ((message.date as number) < (scope.since as number) ||
-            (message.date as number) >= (scope.until as number)))
+        messages.length !== (result.status === "allowed" ? 1 : 0) ||
+        messages.some(
+          (m) =>
+            Object.keys(m).length !== 1 || typeof m.id !== "string" || !m.id,
+        )
       )
         throw new Error("invalid_result");
+    } else {
+      if (messages.length > (scope.maxResults as number))
+        throw new Error("invalid_result");
+      for (const message of messages) {
+        if (
+          Object.keys(message).some(
+            (k) => !(scope.fields as string[]).includes(k),
+          ) ||
+          (message.date !== undefined &&
+            ((message.date as number) < (scope.since as number) ||
+              (message.date as number) >= (scope.until as number)))
+        )
+          throw new Error("invalid_result");
+      }
     }
     const digest = canonical(envelope);
     if (job.resultDigest && job.resultDigest !== digest)

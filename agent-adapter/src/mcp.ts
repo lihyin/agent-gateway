@@ -91,6 +91,44 @@ export function createMcpServer(
       }),
   );
   server.registerTool(
+    "gmail_request_send",
+    {
+      title: "Request approval to send a composed email",
+      description:
+        "Submit an email composed by Muse for review on the paired iPhone. The user must inspect From, To/Cc/Bcc, subject and body, tap Allow and authenticate before Gmail sends. Decline sends nothing. Poll gateway_request_status. Reuse identical requestId and content on transport retries; never create replacement requests automatically after error/expiry because delivery may be uncertain. Entire request JSON must fit 1200 UTF-8 bytes. No attachments or Gmail drafts.",
+      inputSchema: z
+        .object({
+          requestId: z.string().uuid(),
+          purpose: z.string().trim().min(1).max(200),
+          from: z.string().email().max(254),
+          to: z.array(z.string().email().max(254)).min(1).max(20),
+          cc: z.array(z.string().email().max(254)).max(20),
+          bcc: z.array(z.string().email().max(254)).max(20),
+          subject: z.string().min(1).max(200),
+          body: z.string().min(1).max(1200),
+        })
+        .strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async ({ requestId, ...arguments_ }) =>
+      response(async () => {
+        const result = await bridge.request(
+          { source: "gmail", operation: "send", ...arguments_ },
+          requestId,
+        );
+        if (result.status === "pending_device_review")
+          onRequest?.(result.requestId);
+        return automatic
+          ? { requestId: result.requestId, status: result.status }
+          : result;
+      }),
+  );
+  server.registerTool(
     "gateway_request_status",
     {
       title: "Get device review status",
